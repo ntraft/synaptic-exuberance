@@ -1,0 +1,30 @@
+name: synaptic-exuberance
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - notebook
+  - seaborn
+  - pyyaml
+  - tqdm
+  - pytorch
+  - torchvision
+  - wandb
+  - ffmpeg
+  - moviepy
+  - graphviz
+  - python-graphviz
+  - pybox2d
+  - gym
+  - pyglet
+  - swig
+  - pip:
+    - pyyaml-include
+    - neat-python

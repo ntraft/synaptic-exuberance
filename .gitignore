@@ -49,3 +49,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# User-specific files from JetBrains IDEs.
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+
