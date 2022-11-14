@@ -17,13 +17,8 @@ import neat
 import visualize
 
 
+# TODO: Make this a command line argument.
 NUM_CORES = 8
-
-env = gym.make('LunarLander-v2')
-
-
-print("action space: {0!r}".format(env.action_space))
-print("observation space: {0!r}".format(env.observation_space))
 
 
 class LanderGenome(neat.DefaultGenome):
@@ -60,11 +55,11 @@ def compute_fitness(genome, net, episodes, min_reward, max_reward):
     reward_error = []
     for score, data in episodes:
         # Compute normalized discounted reward.
-        dr = np.convolve(data[:, -1], discount_function)[m:]
-        dr = 2 * (dr - min_reward) / (max_reward - min_reward) - 1.0
-        dr = np.clip(dr, -1.0, 1.0)
+        rewards = np.convolve(data[:, -1], discount_function)[m:]
+        rewards = 2 * (rewards - min_reward) / (max_reward - min_reward) - 1.0
+        rewards = np.clip(rewards, -1.0, 1.0)
 
-        for row, dr in zip(data, dr):
+        for row, dr in zip(data, rewards):
             observation = row[:8]
             action = int(row[8])
             output = net.activate(observation)
@@ -86,6 +81,8 @@ class PooledErrorCompute(object):
         self.episode_length = []
 
     def simulate(self, nets):
+        env = gym.make('LunarLander-v2')
+
         scores = []
         for genome, net in nets:
             observation = env.reset()
@@ -113,70 +110,64 @@ class PooledErrorCompute(object):
 
             self.test_episodes.append((score, data))
 
-        print("Score range [{:.3f}, {:.3f}]".format(min(scores), max(scores)))
+        print(f"Score range [{min(scores):.3f}, {max(scores):.3f}]")
 
     def evaluate_genomes(self, genomes, config):
         self.generation += 1
 
         t0 = time.time()
-        nets = []
-        for gid, g in genomes:
-            nets.append((g, neat.nn.FeedForwardNetwork.create(g, config)))
-
-        print("network creation time {0}".format(time.time() - t0))
+        nets = [(g, neat.nn.FeedForwardNetwork.create(g, config)) for gid, g in genomes]
+        print(f"Time to create {len(nets)} networks: {time.time() - t0:.2f}s")
         t0 = time.time()
 
         # Periodically generate a new set of episodes for comparison.
-        if 1 == self.generation % 10:
+        if self.generation % 10 == 1:
+            # Keep at most 300 episodes.
             self.test_episodes = self.test_episodes[-300:]
             self.simulate(nets)
-            print("simulation run time {0}".format(time.time() - t0))
+            print(f"Simulation run time: {time.time() - t0:.2f}s")
             t0 = time.time()
 
         # Assign a composite fitness to each genome; genomes can make progress either
         # by improving their total reward or by making more accurate reward estimates.
-        print("Evaluating {0} test episodes".format(len(self.test_episodes)))
+        msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
         if self.num_workers < 2:
+            print(msg + ", serially...")
             for genome, net in nets:
                 reward_error = compute_fitness(genome, net, self.test_episodes, self.min_reward, self.max_reward)
                 genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
         else:
+            print(msg + f", asynchronously on {self.num_workers} workers...")
             with multiprocessing.Pool(self.num_workers) as pool:
                 jobs = []
                 for genome, net in nets:
                     jobs.append(pool.apply_async(compute_fitness,
-                                                 (genome, net, self.test_episodes,
-                                                  self.min_reward, self.max_reward)))
+                                                 (genome, net, self.test_episodes, self.min_reward, self.max_reward)))
 
                 for job, (genome_id, genome) in zip(jobs, genomes):
                     reward_error = job.get(timeout=None)
                     genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
 
-        print("final fitness compute time {0}\n".format(time.time() - t0))
+        print(f"Final fitness compute time: {time.time() - t0:.2f}s\n")
 
 
-def run():
-    # Load the config file, which is assumed to live in
-    # the same directory as this script.
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config')
-    config = neat.Config(LanderGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
-
+def run_evolution(config, num_best=3, steps_between_eval=5, num_evals=100, score_threshold=200):
+    """
+    Run until the winner from a generation is able to solve the environment or the user interrupts the process.
+    """
+    env = gym.make('LunarLander-v2')
     pop = neat.Population(config)
     stats = neat.StatisticsReporter()
     pop.add_reporter(stats)
     pop.add_reporter(neat.StdOutReporter(True))
     # Checkpoint every 25 generations or 900 seconds.
     pop.add_reporter(neat.Checkpointer(25, 900))
-
-    # Run until the winner from a generation is able to solve the environment
-    # or the user interrupts the process.
     ec = PooledErrorCompute(NUM_CORES)
+    best_genomes = None
+
     while 1:
         try:
-            gen_best = pop.run(ec.evaluate_genomes, 5)
+            gen_best = pop.run(ec.evaluate_genomes, steps_between_eval)
 
             # print(gen_best)
 
@@ -189,27 +180,25 @@ def run():
             plt.savefig("scores.svg")
             plt.close()
 
-            mfs = sum(stats.get_fitness_mean()[-5:]) / 5.0
-            print("Average mean fitness over last 5 generations: {0}".format(mfs))
-
-            mfs = sum(stats.get_fitness_stat(min)[-5:]) / 5.0
-            print("Average min fitness over last 5 generations: {0}".format(mfs))
+            mfs = np.mean(stats.get_fitness_mean()[-steps_between_eval:])
+            print(f"Average mean fitness over last {steps_between_eval} generations: {mfs}")
+            mfs = np.mean(stats.get_fitness_stat(min)[-steps_between_eval:])
+            print(f"Average min fitness over last {steps_between_eval} generations: {mfs}")
 
             # Use the best genomes seen so far as an ensemble-ish control system.
-            best_genomes = stats.best_unique_genomes(3)
-            best_networks = []
-            for g in best_genomes:
-                best_networks.append(neat.nn.FeedForwardNetwork.create(g, config))
+            # TODO: Weird? Cheating? Could conflict with each other? Doesn't properly represent the real result?
+            best_genomes = stats.best_unique_genomes(num_best)
+            best_networks = [neat.nn.FeedForwardNetwork.create(g, config) for g in best_genomes]
 
             solved = True
             best_scores = []
-            for k in range(100):
+            for k in range(num_evals):
                 observation = env.reset()
                 score = 0
                 step = 0
                 while 1:
                     step += 1
-                    # Use the total reward estimates from all five networks to
+                    # Use the total reward estimates from all the best networks to
                     # determine the best action given the current state.
                     votes = np.zeros((4,))
                     for n in best_networks:
@@ -219,7 +208,7 @@ def run():
                     best_action = np.argmax(votes)
                     observation, reward, done, info = env.step(best_action)
                     score += reward
-                    if not os.environ["HEADLESS"]:
+                    if not os.environ.get("HEADLESS"):
                         env.render()
                     if done:
                         break
@@ -228,30 +217,48 @@ def run():
                 ec.episode_length.append(step)
 
                 best_scores.append(score)
-                avg_score = sum(best_scores) / len(best_scores)
+                avg_score = np.mean(best_scores)
                 print(k, score, avg_score)
-                if avg_score < 200:
+                if avg_score < score_threshold:
+                    # As soon as our average score drops below this threshold, stop early and decide we aren't good
+                    # enough yet.
+                    # TODO: This is a super weird criterion. This would mean a different ordering of scores could be
+                    # judged differently.
                     solved = False
                     break
 
             if solved:
                 print("Solved.")
+                return best_genomes
 
-                # Save the winners.
-                for n, g in enumerate(best_genomes):
-                    name = 'winner-{0}'.format(n)
-                    with open(name + '.pickle', 'wb') as f:
-                        pickle.dump(g, f)
-
-                    visualize.draw_net(config, g, view=False, filename=name + "-net.gv")
-                    visualize.draw_net(config, g, view=False, filename=name + "-net-pruned.gv", prune_unused=True)
-
-                break
         except KeyboardInterrupt:
-            print("User break.")
-            break
+            print("User requested termination.")
+            return best_genomes
 
-    env.close()
+        finally:
+            env.close()
+
+
+def run():
+    # Load the config file, which is assumed to live in
+    # the same directory as this script.
+    local_dir = os.path.dirname(__file__)
+    config_path = os.path.join(local_dir, 'config')
+    config = neat.Config(LanderGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                         config_path)
+
+    best_genomes = run_evolution(config)
+
+    # Save the winners.
+    if best_genomes:
+        for n, g in enumerate(best_genomes):
+            name = 'winner-{0}'.format(n)
+            with open(name + '.pickle', 'wb') as f:
+                pickle.dump(g, f)
+
+            visualize.draw_net(config, g, view=False, filename=name + "-net.gv")
+            visualize.draw_net(config, g, view=False, filename=name + "-net-pruned.gv", prune_unused=True)
 
 
 if __name__ == '__main__':
