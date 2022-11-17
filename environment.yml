@@ -27,4 +27,7 @@ dependencies:
   - swig
   - pip:
     - pyyaml-include
-    - neat-python
+    - gizeh
+    # Don't install neat-python from pip, because you'll get a version from 2017.
+    # Or, you can install it and change the source to be compatible.
+    # - neat-python
