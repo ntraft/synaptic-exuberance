@@ -1,3 +1,9 @@
+# Ignore experiment products/outputs.
+**.svg
+**.mp4
+**.gv
+**/winner*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
