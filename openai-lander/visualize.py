@@ -5,20 +5,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
+def plot_stats(stats, ylog=False, view=False, filename='avg_fitness.svg'):
     """ Plots the population's average and best fitness. """
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
         return
 
-    generation = range(len(statistics.most_fit_genomes))
-    best_fitness = [c.fitness for c in statistics.most_fit_genomes]
-    avg_fitness = np.array(statistics.get_fitness_mean())
-    stdev_fitness = np.array(statistics.get_fitness_stdev())
+    generation = range(len(stats.most_fit_genomes))
+    plt.plot(generation, stats.get_fitness_stat(min), 'b.', label="min")
+    plt.plot(generation, stats.get_fitness_stat(max), 'b.', label="max")
 
+    avg_fitness = np.array(stats.get_fitness_mean())
     plt.plot(generation, avg_fitness, 'b-', label="average")
+
+    # stdev_fitness = np.array(stats.get_fitness_stdev())
     # plt.plot(generation, avg_fitness - stdev_fitness, 'g-.', label="-1 sd")
-    plt.plot(generation, avg_fitness + stdev_fitness, 'g-.', label="+1 sd")
+    # plt.plot(generation, avg_fitness + stdev_fitness, 'g-.', label="+1 sd")
+
+    best_fitness = [c.fitness for c in stats.most_fit_genomes]
     plt.plot(generation, best_fitness, 'r-', label="best")
 
     plt.title("Population's average and best fitness")
@@ -36,13 +40,13 @@ def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
     plt.close()
 
 
-def plot_species(statistics, view=False, filename='speciation.svg'):
+def plot_species(stats, view=False, filename='speciation.svg'):
     """ Visualizes speciation throughout evolution. """
     if plt is None:
         warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
         return
 
-    species_sizes = statistics.get_species_sizes()
+    species_sizes = stats.get_species_sizes()
     num_generations = len(species_sizes)
     curves = np.array(species_sizes).T
 

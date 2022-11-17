@@ -9,11 +9,12 @@ import pickle
 import random
 import time
 
+import neat
 import gym.wrappers
 import matplotlib.pyplot as plt
 import numpy as np
 
-import neat
+import util.reporters as reporters
 import visualize
 
 
@@ -157,7 +158,7 @@ def run_evolution(config, num_best=3, steps_between_eval=5, num_evals=100, score
     """
     env = gym.make('LunarLander-v2')
     pop = neat.Population(config)
-    stats = neat.StatisticsReporter()
+    stats = reporters.StatisticsReporter()
     pop.add_reporter(stats)
     pop.add_reporter(neat.StdOutReporter(True))
     # Checkpoint every 25 generations or 900 seconds.
