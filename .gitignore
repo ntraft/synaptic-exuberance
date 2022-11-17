@@ -3,6 +3,7 @@
 **.mp4
 **.gv
 **/winner*
+**/neat-checkpoint*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
