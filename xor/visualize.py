@@ -113,11 +113,6 @@ def plot_species(statistics, view=False, filename='speciation.svg'):
 def draw_net(config, genome, view=False, filename=None, node_names=None, show_disabled=True, prune_unused=False,
              node_colors=None, fmt='svg'):
     """ Receives a genome and draws a neural network with arbitrary topology. """
-    # Attributes for network nodes.
-    if graphviz is None:
-        warnings.warn("This display is not available due to a missing optional dependency (graphviz)")
-        return
-
     # If requested, use a copy of the genome which omits all components that won't affect the output.
     if prune_unused:
         genome = genome.get_pruned_copy(config.genome_config)
@@ -168,9 +163,9 @@ def draw_net(config, genome, view=False, filename=None, node_names=None, show_di
         if cg.enabled or show_disabled:
             # if cg.input not in used_nodes or cg.output not in used_nodes:
             #    continue
-            input, output = cg.key
-            a = node_names.get(input, str(input))
-            b = node_names.get(output, str(output))
+            input_, output_ = cg.key
+            a = node_names.get(input_, str(input_))
+            b = node_names.get(output_, str(output_))
             style = 'solid' if cg.enabled else 'dotted'
             color = 'green' if cg.weight > 0 else 'red'
             width = str(0.1 + abs(cg.weight / 5.0))
