@@ -1,19 +1,24 @@
-# Evolve a control/reward estimation network for the OpenAI Gym
-# LunarLander-v2 environment (https://gym.openai.com/envs/LunarLander-v2).
-# Sample run here: https://gym.openai.com/evaluations/eval_FbKq5MxAS9GlvB7W6ioJkg
-
+"""
+Evolve a control/reward estimation network for the Moon Lander example from OpenAI Gym.
+LunarLander-v2 environment (https://gym.openai.com/envs/LunarLander-v2).
+Sample run here: https://gym.openai.com/evaluations/eval_FbKq5MxAS9GlvB7W6ioJkg
+"""
 
 import multiprocessing
 import os
 import pickle
 import random
+import sys
 import time
+from pathlib import Path
 
 import neat
 import gym.wrappers
 import matplotlib.pyplot as plt
 import numpy as np
 
+print(os.environ["PYTHONPATH"])
+print(sys.path)
 import util.reporters as reporters
 import visualize
 
@@ -152,7 +157,7 @@ class PooledErrorCompute(object):
         print(f"Final fitness compute time: {time.time() - t0:.2f}s\n")
 
 
-def run_evolution(config, num_best=3, steps_between_eval=5, num_evals=100, score_threshold=200):
+def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_evals=100, score_threshold=200):
     """
     Run until the winner from a generation is able to solve the environment or the user interrupts the process.
     """
@@ -172,13 +177,14 @@ def run_evolution(config, num_best=3, steps_between_eval=5, num_evals=100, score
 
             # print(gen_best)
 
-            visualize.plot_stats(stats, ylog=False, view=False, filename="fitness.svg")
+            visualize.plot_fitness(stats, savepath=result_dir / "fitness.svg")
+            visualize.plot_species(stats, savepath=result_dir / "speciation.svg")
 
             plt.plot(ec.episode_score, 'g-', label='score')
             plt.plot(ec.episode_length, 'b-', label='length')
             plt.grid()
             plt.legend(loc='best')
-            plt.savefig("scores.svg")
+            plt.savefig(result_dir / "scores.svg")
             plt.close()
 
             mfs = np.mean(stats.get_fitness_mean()[-steps_between_eval:])
@@ -240,26 +246,29 @@ def run_evolution(config, num_best=3, steps_between_eval=5, num_evals=100, score
             env.close()
 
 
-def run():
-    # Load the config file, which is assumed to live in
-    # the same directory as this script.
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config')
-    config = neat.Config(LanderGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
+def make_config(cfg_path):
+    return neat.Config(LanderGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, cfg_path)
 
-    best_genomes = run_evolution(config)
+
+def run():
+    # Load the config file, which is assumed to live in the same directory as this script.
+    local_dir = Path(__file__).parent
+    config = make_config(local_dir / "config")
+
+    result_path = local_dir / "results"
+    result_path.mkdir(exist_ok=True)
+
+    best_genomes = run_evolution(config, result_path)
 
     # Save the winners.
     if best_genomes:
         for n, g in enumerate(best_genomes):
-            name = 'winner-{0}'.format(n)
-            with open(name + '.pickle', 'wb') as f:
+            name = f"winner-{n}"
+            with open(result_path / f"{name}.pkl", "wb") as f:
                 pickle.dump(g, f)
 
-            visualize.draw_net(config, g, view=False, filename=name + "-net.gv")
-            visualize.draw_net(config, g, view=False, filename=name + "-net-pruned.gv", prune_unused=True)
+            visualize.draw_net(config, g, view=False, savepath=result_path / f"{name}-net.gv")
+            visualize.draw_net(config, g, view=False, savepath=result_path / f"{name}-net-pruned.gv", prune_unused=True)
 
 
 if __name__ == '__main__':
