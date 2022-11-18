@@ -3,8 +3,8 @@ Single-pole balancing experiment using a feed-forward neural network.
 """
 
 import multiprocessing
-import os
 import pickle
+from pathlib import Path
 
 import cart_pole
 import neat
@@ -52,14 +52,18 @@ def eval_genomes(genomes, config):
         genome.fitness = eval_genome(genome, config)
 
 
+def make_config(config_path):
+    return neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                       config_path)
+
+
 def run():
-    # Load the config file, which is assumed to live in
-    # the same directory as this script.
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config-feedforward')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
+    # Load the config file, which is assumed to live in the same directory as this script.
+    local_dir = Path(__file__).parent
+    config = make_config(local_dir / "config-feedforward")
+
+    result_path = local_dir / "results"
+    result_path.mkdir(exist_ok=True)
 
     pop = neat.Population(config)
     stats = neat.StatisticsReporter()
@@ -74,18 +78,18 @@ def run():
         winner = pop.best_genome
 
     # Save the winner.
-    with open('winner-feedforward', 'wb') as f:
+    with open(result_path / "winner-feedforward.pkl", "wb") as f:
         pickle.dump(winner, f)
 
     print(winner)
 
-    visualize.plot_stats(stats, ylog=False, view=True, filename="feedforward-fitness.svg")
-    visualize.plot_species(stats, view=True, filename="feedforward-speciation.svg")
+    visualize.plot_stats(stats, ylog=False, view=True, savepath=result_path / "feedforward-fitness.svg")
+    visualize.plot_species(stats, view=True, savepath=result_path / "feedforward-speciation.svg")
 
     node_names = {-1: 'x', -2: 'dx', -3: 'theta', -4: 'dtheta', 0: 'control'}
-    visualize.draw_net(config, winner, node_names=node_names, filename="winner-feedforward.gv")
-    visualize.draw_net(config, winner, node_names=node_names, filename="winner-feedforward-enabled-pruned.gv",
-                       prune_unused=True)
+    visualize.draw_net(config, winner, node_names=node_names, savepath=result_path / "winner-feedforward.gv")
+    visualize.draw_net(config, winner, node_names=node_names,
+                       savepath=result_path / "winner-feedforward-enabled-pruned.gv", prune_unused=True)
 
 
 if __name__ == '__main__':

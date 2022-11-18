@@ -2,30 +2,32 @@
 Test the performance of the best genome produced by evolve-feedforward.py.
 """
 
-import os
 import pickle
+from pathlib import Path
 
 import neat
 from cart_pole import CartPole, discrete_actuator_force
 from movie import make_movie
 
+from evolve_feedforward import make_config
+
+
+local_dir = Path(__file__).parent
+result_path = local_dir / "results"
+
 # load the winner
-with open('winner-feedforward', 'rb') as f:
+with open(result_path / "winner-feedforward.pkl", "rb") as f:
     c = pickle.load(f)
 
 print('Loaded genome:')
 print(c)
 
-# Load the config file, which is assumed to live in
-# the same directory as this script.
-local_dir = os.path.dirname(__file__)
-config_path = os.path.join(local_dir, 'config-feedforward')
-config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                     neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                     config_path)
+# Load the config file.
+config = make_config(local_dir / "config-feedforward")
 
-net = neat.nn.FeedForwardNetwork.create(c, config)
+# Instantiate the simulation.
 sim = CartPole()
+net = neat.nn.FeedForwardNetwork.create(c, config)
 
 print()
 print("Initial conditions:")
@@ -63,4 +65,4 @@ print("    theta = {0:.4f}".format(sim.theta))
 print("theta_dot = {0:.4f}".format(sim.dtheta))
 print()
 print("Making movie...")
-make_movie(net, discrete_actuator_force, 15.0, "feedforward-movie.mp4")
+make_movie(net, discrete_actuator_force, 15.0, result_path / "feedforward-movie.mp4")

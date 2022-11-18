@@ -3,8 +3,8 @@ Single-pole balancing experiment using a continuous-time recurrent neural networ
 """
 
 import multiprocessing
-import os
 import pickle
+from pathlib import Path
 
 import cart_pole
 import neat
@@ -44,20 +44,24 @@ def eval_genome(genome, config):
 
         fitnesses.append(fitness)
 
-        # print("{0} fitness {1}".format(net, fitness))
+        # print(f"{net} fitness {fitness}")
 
     # The genome's fitness is its worst performance across all runs.
     return min(fitnesses)
 
 
+def make_config(config_path):
+    return neat.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                       config_path)
+
+
 def run():
-    # Load the config file, which is assumed to live in
-    # the same directory as this script.
-    local_dir = os.path.dirname(__file__)
-    config_path = os.path.join(local_dir, 'config-ctrnn')
-    config = neat.Config(neat.DefaultGenome, neat.DefaultReproduction,
-                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
-                         config_path)
+    # Load the config file, which is assumed to live in the same directory as this script.
+    local_dir = Path(__file__).parent
+    config = make_config(local_dir / "config-ctrnn")
+
+    result_path = local_dir / "results"
+    result_path.mkdir(exist_ok=True)
 
     pop = neat.Population(config)
     stats = neat.StatisticsReporter()
@@ -68,21 +72,21 @@ def run():
     winner = pop.run(pe.evaluate)
 
     # Save the winner.
-    with open('winner-ctrnn', 'wb') as f:
+    with open(result_path / "winner-ctrnn.pkl", "wb") as f:
         pickle.dump(winner, f)
 
     print(winner)
 
-    visualize.plot_stats(stats, ylog=True, view=True, filename="ctrnn-fitness.svg")
-    visualize.plot_species(stats, view=True, filename="ctrnn-speciation.svg")
+    visualize.plot_stats(stats, ylog=True, view=True, savepath=result_path / "ctrnn-fitness.svg")
+    visualize.plot_species(stats, view=True, savepath=result_path / "ctrnn-speciation.svg")
 
     node_names = {-1: 'x', -2: 'dx', -3: 'theta', -4: 'dtheta', 0: 'control'}
     visualize.draw_net(config, winner, True, node_names=node_names)
 
     visualize.draw_net(config, winner, view=True, node_names=node_names,
-                       filename="winner-ctrnn.gv")
+                       savepath=result_path / "winner-ctrnn.gv")
     visualize.draw_net(config, winner, view=True, node_names=node_names,
-                       filename="winner-ctrnn-pruned.gv", prune_unused=True)
+                       savepath=result_path / "winner-ctrnn-pruned.gv", prune_unused=True)
 
 
 if __name__ == '__main__':

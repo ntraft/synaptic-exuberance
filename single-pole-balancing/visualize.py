@@ -1,4 +1,6 @@
-import copy
+"""
+Viz utils for Cart-Pole.
+"""
 import warnings
 
 import graphviz
@@ -6,12 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
+def plot_stats(statistics, ylog=False, view=False, savepath="fitness.svg"):
     """ Plots the population's average and best fitness. """
-    if plt is None:
-        warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
-        return
-
     generation = range(len(statistics.most_fit_genomes))
     best_fitness = [c.fitness for c in statistics.most_fit_genomes]
     avg_fitness = np.array(statistics.get_fitness_mean())
@@ -30,19 +28,16 @@ def plot_stats(statistics, ylog=False, view=False, filename='avg_fitness.svg'):
     if ylog:
         plt.gca().set_yscale('symlog')
 
-    plt.savefig(filename)
+    if savepath:
+        plt.savefig(savepath)
     if view:
         plt.show()
 
     plt.close()
 
 
-def plot_spikes(spikes, view=False, filename=None, title=None):
+def plot_spikes(spikes, view=False, savepath=None, title=None):
     """ Plots the trains for a single spiking neuron. """
-    if plt is None:
-        warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
-        return
-
     t_values = [t for t, I, v, u in spikes]
     v_values = [v for t, I, v, u in spikes]
     u_values = [u for t, I, v, u in spikes]
@@ -72,8 +67,8 @@ def plot_spikes(spikes, view=False, filename=None, title=None):
     plt.grid()
     plt.plot(t_values, I_values, "r-o")
 
-    if filename is not None:
-        plt.savefig(filename)
+    if savepath:
+        plt.savefig(savepath)
 
     if view:
         plt.show()
@@ -83,12 +78,8 @@ def plot_spikes(spikes, view=False, filename=None, title=None):
     return fig
 
 
-def plot_species(statistics, view=False, filename='speciation.svg'):
+def plot_species(statistics, view=False, savepath="speciation.svg"):
     """ Visualizes speciation throughout evolution. """
-    if plt is None:
-        warnings.warn("This display is not available due to a missing optional dependency (matplotlib)")
-        return
-
     species_sizes = statistics.get_species_sizes()
     num_generations = len(species_sizes)
     curves = np.array(species_sizes).T
@@ -100,7 +91,8 @@ def plot_species(statistics, view=False, filename='speciation.svg'):
     plt.ylabel("Size per Species")
     plt.xlabel("Generations")
 
-    plt.savefig(filename)
+    if savepath:
+        plt.savefig(savepath)
 
     if view:
         plt.show()
@@ -108,14 +100,9 @@ def plot_species(statistics, view=False, filename='speciation.svg'):
     plt.close()
 
 
-def draw_net(config, genome, view=False, filename=None, node_names=None, show_disabled=True, prune_unused=False,
+def draw_net(config, genome, view=False, savepath=None, node_names=None, show_disabled=True, prune_unused=False,
              node_colors=None, fmt='svg'):
     """ Receives a genome and draws a neural network with arbitrary topology. """
-    # Attributes for network nodes.
-    if graphviz is None:
-        warnings.warn("This display is not available due to a missing optional dependency (graphviz)")
-        return
-
     # If requested, use a copy of the genome which omits all components that won't affect the output.
     if prune_unused:
         if show_disabled:
@@ -173,6 +160,6 @@ def draw_net(config, genome, view=False, filename=None, node_names=None, show_di
             width = str(0.1 + abs(cg.weight / 5.0))
             dot.edge(a, b, _attributes={'style': style, 'color': color, 'penwidth': width})
 
-    dot.render(filename, view=view)
+    dot.render(savepath, view=view)
 
     return dot
