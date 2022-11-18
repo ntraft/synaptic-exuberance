@@ -1,5 +1,6 @@
-import warnings
-
+"""
+Viz utils for the OpenAI Lunar Lander.
+"""
 import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
