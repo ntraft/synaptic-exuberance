@@ -117,7 +117,6 @@ def draw_net(config, genome, view=False, savepath=None, node_names=None, show_di
             width = str(0.1 + abs(cg.weight / 5.0))
             dot.edge(a, b, _attributes={'style': style, 'color': color, 'penwidth': width})
 
-    if savepath:
-        dot.render(savepath, view=view)
+    dot.render(savepath, view=view)
 
     return dot

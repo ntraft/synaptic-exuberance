@@ -13,6 +13,8 @@ import numpy as np
 from evolve import make_config, LanderGenome
 
 
+# TODO: Possibly output actual action values for debugging?
+# TODO: Investigate whether there is some artificial limitation that forces the net to never use the engine??
 def make_videos(name, net, num_videos=5):
     """
     Generate some example videos for the given network.
