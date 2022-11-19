@@ -2,7 +2,6 @@
 Test the best network and produce a movie of sample runs.
 """
 
-import math
 import pickle
 import sys
 import warnings
@@ -10,7 +9,6 @@ from pathlib import Path
 
 import neat
 import gym.wrappers
-import matplotlib.pyplot as plt
 import numpy as np
 
 import util.argparsing as argutils
@@ -46,23 +44,7 @@ def make_videos(name, net, result_path, num_episodes=5):
 
         # Plot histogram of each output.
         if outputs:
-            outputs = np.array(outputs)
-            if np.all(np.isclose(outputs, 0.0)):
-                print(f"All outputs for {name} were zero!")
-            outsz = outputs.shape[1]
-            num_cols = int(np.sqrt(outsz))
-            num_rows = math.ceil(outsz / num_cols)
-            fig, grid = plt.subplots(num_rows, num_cols, squeeze=False, gridspec_kw={"wspace": 0.3, "hspace": 0.5})
-            for r, row in enumerate(grid):
-                for c, ax in enumerate(row):
-                    i = r * num_rows + c
-                    vals = outputs[:, i]
-                    ax.hist(vals, bins="auto")
-                    oid = net.output_nodes[i]
-                    ax.set_title(f"Distribution of Output Node {oid}")
-                    ax.set_ylabel("Count")
-                    ax.set_xlabel(f"Node {oid} Value")
-            plt.savefig(result_path / f"{name}-test-outputs.svg")
+            visualize.plot_net_outputs(outputs, name, net, result_path)
     finally:
         env.close()
 

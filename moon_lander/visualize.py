@@ -1,6 +1,8 @@
 """
 Viz utils for the OpenAI Lunar Lander.
 """
+import math
+
 import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
@@ -58,6 +60,40 @@ def plot_species(stats, view=False, savepath="speciation.svg"):
         plt.show()
 
     plt.close()
+
+
+def plot_net_outputs(outputs, name, net, result_path):
+    """
+    Plots a histogram of each output pin over a number of timesteps. Also plots an overall action distribution, assuming
+    the chosen action is the one with the maximum value.
+    """
+    outputs = np.array(outputs)
+    num_plots = outputs.shape[1] + 1  # one plot per output, plus one overall plot.
+    num_cols = int(np.sqrt(num_plots))  # make the layout as close to square as possible.
+    num_rows = math.ceil(num_plots / num_cols)
+    fig, grid = plt.subplots(num_rows, num_cols, squeeze=False, figsize=(4*num_cols, 3*num_rows),
+                             gridspec_kw={"hspace": 0.4})
+    fig.suptitle("Output Distributions", fontsize="x-large")
+    for r, row in enumerate(grid):
+        for c, ax in enumerate(row):
+            i = r * num_cols + c - 1  # minus 1 to reserve the first spot for the "overall" plot.
+            if i < 0:
+                vals = np.argmax(outputs, axis=1)
+                # For 4 outputs, this produces bins:
+                #      0    1    2    3       <---- bin values
+                # [-0.5, 0.5, 1.5, 2.5, 3.5]  <---- bin edges
+                ax.hist(vals, bins=np.arange(-0.5, outputs.shape[1] + 0.5))
+                ax.set_title(f"Distribution of Actions")
+                ax.set_ylabel("Count")
+                ax.set_xlabel(f"Action Number")
+            elif i < outputs.shape[1]:  # skip the last plot if we have an odd number of plots.
+                vals = outputs[:, i]
+                ax.hist(vals, bins="auto")
+                oid = net.output_nodes[i]
+                ax.set_title(f"Distribution of Output Node {oid}")
+                ax.set_ylabel("Count")
+                ax.set_xlabel(f"Node {oid} Value")
+    plt.savefig(result_path / f"{name}-test-outputs.svg")
 
 
 def draw_net(config, genome, view=False, savepath=None, node_names=None, show_disabled=True, prune_unused=False,
