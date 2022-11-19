@@ -71,6 +71,16 @@ def draw_net(config, genome, view=False, savepath=None, node_names=None, show_di
         node_names = {}
     assert type(node_names) is dict
 
+    def display_name(node_id):
+        return node_names.get(node_id, str(node_id))
+
+    def label(node_id):
+        lbl = display_name(node_id)
+        node = genome.nodes.get(node_id)
+        if node is not None:
+            lbl += f"\n{node.activation}(\n{node.bias:.2f} +\n{node.response:.2f} * {node.aggregation}(inputs))"
+        return lbl
+
     if node_colors is None:
         node_colors = {}
     assert type(node_colors) is dict
@@ -79,45 +89,34 @@ def draw_net(config, genome, view=False, savepath=None, node_names=None, show_di
         'shape': 'circle',
         'fontsize': '9',
         'height': '0.2',
-        'width': '0.2'}
+        'width': '0.2',
+    }
 
     dot = graphviz.Digraph(format=fmt, node_attr=node_attrs)
 
-    inputs = set()
-    for k in config.genome_config.input_keys:
-        inputs.add(k)
-        name = node_names.get(k, str(k))
-        input_attrs = {'style': 'filled', 'shape': 'box', 'fillcolor': node_colors.get(k, 'lightgray')}
-        dot.node(name, _attributes=input_attrs)
-
-    outputs = set()
-    for k in config.genome_config.output_keys:
-        outputs.add(k)
-        name = node_names.get(k, str(k))
-        node_attrs = {'style': 'filled', 'fillcolor': node_colors.get(k, 'lightblue')}
-
-        dot.node(name, _attributes=node_attrs)
-
-    used_nodes = set(genome.nodes.keys())
-    for n in used_nodes:
-        if n in inputs or n in outputs:
-            continue
-
+    # Draw nodes.
+    inputs = set(list(config.genome_config.input_keys))
+    outputs = set(list(config.genome_config.output_keys))
+    all_nodes = set(list(config.genome_config.input_keys) + list(genome.nodes.keys()))
+    for n in all_nodes:
         attrs = {'style': 'filled', 'fillcolor': node_colors.get(n, 'white')}
-        dot.node(str(n), _attributes=attrs)
+        if n in inputs:
+            attrs['fillcolor'] = node_colors.get(n, 'lightgray')
+            attrs['shape'] = 'box'
+        if n in outputs:
+            attrs['fillcolor'] = node_colors.get(n, 'lightblue')
+        dot.node(display_name(n), label(n), _attributes=attrs)
 
+    # Draw edges.
     for cg in genome.connections.values():
         if cg.enabled or show_disabled:
-            # if cg.input not in used_nodes or cg.output not in used_nodes:
-            #    continue
             input_, output_ = cg.key
-            a = node_names.get(input_, str(input_))
-            b = node_names.get(output_, str(output_))
             style = 'solid' if cg.enabled else 'dotted'
             color = 'green' if cg.weight > 0 else 'red'
             width = str(0.1 + abs(cg.weight / 5.0))
-            dot.edge(a, b, _attributes={'style': style, 'color': color, 'penwidth': width})
+            dot.edge(display_name(input_), display_name(output_), f"{cg.weight:.2f}",
+                     _attributes={'style': style, 'color': color, 'penwidth': width})
 
+    # Finally, render and return.
     dot.render(savepath, view=view)
-
     return dot

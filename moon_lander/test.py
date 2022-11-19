@@ -14,10 +14,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import util.argparsing as argutils
+import visualize
 from evolve import make_config, LanderGenome
 
 
-# TODO: Investigate whether there is some artificial limitation that forces the net to never use the engine??
 def make_videos(name, net, result_path, num_episodes=5):
     """
     Generate some example videos for the given network.
@@ -80,6 +80,7 @@ def main(argv=None):
                              " value, indicating we should test a randomly instantiated NEAT genome.")
     parser.add_argument("-n", "--num-episodes", metavar="INT", type=int, default=5,
                         help="Number of episodes to run on each model.")
+    parser.add_argument("-g", "--write-graph", action="store_true", help="Also save a visualization of the network(s).")
     args = parser.parse_args(argv)
     config = make_config(args.config)
     if args.model == "random":
@@ -91,6 +92,7 @@ def main(argv=None):
     for path in sorted(args.results_dir.glob(args.model)):
         with open(path, "rb") as f:
             g = pickle.load(f)
+            visualize.draw_net(config, g, savepath=args.results_dir / f"{path.stem}-net-pruned.gv", prune_unused=True)
             net = neat.nn.FeedForwardNetwork.create(g, config)
             make_videos(path.stem, net, args.results_dir, args.num_episodes)
 
