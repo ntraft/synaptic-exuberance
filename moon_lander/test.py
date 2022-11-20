@@ -1,7 +1,7 @@
 """
 Test the best network and produce a movie of sample runs.
 """
-
+import os
 import pickle
 import sys
 import warnings
@@ -21,10 +21,11 @@ def make_videos(name, net, result_path, num_episodes=5):
     Generate some example videos for the given network.
     """
     env = gym.make('LunarLander-v2')
-    # Record one long video for all episodes, but it shouldn't take longer than 60 seconds. Assume 30 fps.
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
-        env = gym.wrappers.RecordVideo(env, result_path.name, name_prefix=name, video_length=60 * 30)
+    if not os.environ.get("HEADLESS"):
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
+            # Record one long video for all episodes, but it shouldn't take longer than 60 seconds. Assume 30 fps.
+            env = gym.wrappers.RecordVideo(env, result_path.name, name_prefix=name, video_length=60 * 30)
     try:
         print(f"Generating videos for {name}...")
         outputs = []
