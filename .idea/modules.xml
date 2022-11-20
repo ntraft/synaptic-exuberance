@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/../neat-python/.idea/neat-python.iml" filepath="$PROJECT_DIR$/../neat-python/.idea/neat-python.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/synaptic-exuberance.iml" filepath="$PROJECT_DIR$/.idea/synaptic-exuberance.iml" />
     </modules>
   </component>
