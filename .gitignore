@@ -1,5 +1,6 @@
 # Ignore experiment products/outputs.
 results/
+experiments/
 **.svg
 **.mp4
 **.gv
