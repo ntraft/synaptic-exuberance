@@ -19,8 +19,8 @@ import numpy as np
 
 import util.argparsing as argutils
 import util.reporters as reporters
-import moon_lander.visualize as visualize
-from moon_lander.config import make_config
+import gymex.visualize as visualize
+from gymex.config import make_config
 
 
 NUM_CORES = os.cpu_count()
