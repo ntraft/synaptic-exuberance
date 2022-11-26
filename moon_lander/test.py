@@ -29,9 +29,10 @@ def make_videos(name, net, result_path, num_episodes=5):
     try:
         print(f"Generating videos for {name}...")
         outputs = []
+        rewards = []
         for i in range(1, num_episodes + 1):
             step = 0
-            score = 0
+            episode_rewards = []
             observation = env.reset()
             done = False
             while not done:
@@ -40,12 +41,15 @@ def make_videos(name, net, result_path, num_episodes=5):
                 outputs.append(output)
                 action = np.argmax(output)
                 observation, reward, done, info = env.step(action)
-                score += reward
-            print(f"    Score for episode {i}: {score}")
+                episode_rewards.append(reward)
+            rewards.append(episode_rewards)
+            print(f"    Score for episode {i}: {sum(episode_rewards)}")
 
-        # Plot histogram of each output.
+        # Plot stats.
+        if rewards:
+            visualize.plot_reward_trajectories(rewards, savepath=result_path / f"{name}-rewards.svg")
         if outputs:
-            visualize.plot_net_outputs(outputs, name, net, result_path)
+            visualize.plot_net_outputs(outputs, net, savepath=result_path / f"{name}-test-outputs.svg")
     finally:
         env.close()
 

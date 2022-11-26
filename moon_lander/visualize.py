@@ -2,6 +2,7 @@
 Viz utils for the OpenAI Lunar Lander.
 """
 import math
+from pathlib import Path
 
 import graphviz
 import matplotlib.pyplot as plt
@@ -55,14 +56,44 @@ def plot_species(stats, view=False, savepath="speciation.svg"):
 
     if savepath:
         plt.savefig(savepath)
-
     if view:
         plt.show()
 
     plt.close()
 
 
-def plot_net_outputs(outputs, name, net, result_path):
+def plot_reward_trajectories(rewards, view=False, savepath="rewards.svg"):
+    fig, ((ax1, ax2),) = plt.subplots(1, 2, squeeze=False, figsize=(8, 3), gridspec_kw={"wspace": 0.3, "hspace": 0.3})
+    fig.suptitle("Rewards Over Time", fontsize="x-large")
+
+    # Plot raw rewards.
+    for i, traj in enumerate(rewards):
+        ax1.plot(traj, label=f"Episode {i}")
+    ax1.legend()
+    ax1.set_xlabel("Timestep")
+    ax1.set_ylabel("Reward")
+
+    # Plot cumulative rewards.
+    for i, traj in enumerate(rewards):
+        cum_reward = np.full_like(traj, np.nan)
+        count = 0
+        for j in range(len(traj)):
+            count += traj[j]
+            cum_reward[j] = count
+        ax2.plot(cum_reward, label=f"Episode {i}")
+    ax2.legend()
+    ax2.set_xlabel("Timestep")
+    ax2.set_ylabel("Cumulative Reward")
+
+    if savepath:
+        plt.savefig(savepath)
+    if view:
+        plt.show()
+
+    plt.close()
+
+
+def plot_net_outputs(outputs, net, view=False, savepath="outputs.svg"):
     """
     Plots a histogram of each output pin over a number of timesteps. Also plots an overall action distribution, assuming
     the chosen action is the one with the maximum value.
@@ -93,7 +124,13 @@ def plot_net_outputs(outputs, name, net, result_path):
                 ax.set_title(f"Distribution of Output Node {oid}")
                 ax.set_ylabel("Count")
                 ax.set_xlabel(f"Node {oid} Value")
-    plt.savefig(result_path / f"{name}-test-outputs.svg")
+
+    if savepath:
+        plt.savefig(savepath)
+    if view:
+        plt.show()
+
+    plt.close()
 
 
 def draw_net(config, genome, view=False, savepath=None, node_names=None, show_disabled=True, prune_unused=False,
