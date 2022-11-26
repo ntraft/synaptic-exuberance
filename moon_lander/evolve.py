@@ -17,14 +17,17 @@ import gym.wrappers
 import matplotlib.pyplot as plt
 import numpy as np
 
-print(os.environ["PYTHONPATH"])
-print(sys.path)
+print(f"PYTHONPATH = {os.environ['PYTHONPATH']}")
+print(f"sys.path = {sys.path}")
 import util.reporters as reporters
 import visualize
 
 
-# TODO: Make this a command line argument.
-NUM_CORES = 8
+NUM_CORES = os.cpu_count()
+if hasattr(os, "sched_getaffinity"):
+    # This function is only available on certain platforms. When running with Slurm, it can tell us the true number of
+    # cores we have access to.
+    NUM_CORES = len(os.sched_getaffinity(0))
 
 
 class LanderGenome(neat.DefaultGenome):
@@ -69,7 +72,9 @@ def compute_fitness(genome, net, episodes, min_reward, max_reward):
             observation = row[:8]
             action = int(row[8])
             output = net.activate(observation)
-            reward_error.append(float((output[action] - dr) ** 2))
+            reward_error.append(float((output[action] - dr) ** 2))  # squared error from discounted reward value???
+            # TODO: This is extremely vulnerable to strange minima. We need to do more than simply predict the reward of
+            # TODO: our own policy.
 
     return reward_error
 
@@ -262,6 +267,7 @@ def run():
 
     # Save the winners.
     if best_genomes:
+        print(f"Saving {len(best_genomes)} best genomes.")
         for n, g in enumerate(best_genomes):
             name = f"winner-{n}"
             with open(result_path / f"{name}.pkl", "wb") as f:
