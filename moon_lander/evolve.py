@@ -17,10 +17,10 @@ import gym.wrappers
 import matplotlib.pyplot as plt
 import numpy as np
 
-print(f"PYTHONPATH = {os.environ['PYTHONPATH']}")
-print(f"sys.path = {sys.path}")
+import util.argparsing as argutils
 import util.reporters as reporters
-import visualize
+import moon_lander.visualize as visualize
+from moon_lander.config import make_config
 
 
 NUM_CORES = os.cpu_count()
@@ -28,33 +28,6 @@ if hasattr(os, "sched_getaffinity"):
     # This function is only available on certain platforms. When running with Slurm, it can tell us the true number of
     # cores we have access to.
     NUM_CORES = len(os.sched_getaffinity(0))
-
-
-class LanderGenome(neat.DefaultGenome):
-    def __init__(self, key):
-        super().__init__(key)
-        self.discount = None
-
-    def configure_new(self, config):
-        super().configure_new(config)
-        self.discount = 0.01 + 0.98 * random.random()
-
-    def configure_crossover(self, genome1, genome2, config):
-        super().configure_crossover(genome1, genome2, config)
-        self.discount = random.choice((genome1.discount, genome2.discount))
-
-    def mutate(self, config):
-        super().mutate(config)
-        self.discount += random.gauss(0.0, 0.05)
-        self.discount = max(0.01, min(0.99, self.discount))
-
-    def distance(self, other, config):
-        dist = super().distance(other, config)
-        disc_diff = abs(self.discount - other.discount)
-        return dist + disc_diff
-
-    def __str__(self):
-        return f"Reward discount: {self.discount}\n{super().__str__()}"
 
 
 def compute_fitness(genome, net, episodes, min_reward, max_reward):
@@ -162,11 +135,11 @@ class PooledErrorCompute(object):
         print(f"Final fitness compute time: {time.time() - t0:.2f}s\n")
 
 
-def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_evals=100, score_threshold=200):
+def run_evolution(config, result_dir):
     """
     Run until the winner from a generation is able to solve the environment or the user interrupts the process.
     """
-    env = gym.make('LunarLander-v2')
+    env = gym.make(config.gym_config.env_id)
     pop = neat.Population(config)
     stats = reporters.StatisticsReporter()
     pop.add_reporter(stats)
@@ -174,6 +147,7 @@ def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_eval
     # Checkpoint every 25 generations or 900 seconds.
     pop.add_reporter(neat.Checkpointer(25, 900))
     ec = PooledErrorCompute(NUM_CORES)
+    steps_between_eval = config.gym_config.steps_between_eval
     best_genomes = None
 
     while 1:
@@ -199,12 +173,12 @@ def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_eval
 
             # Use the best genomes seen so far as an ensemble-ish control system.
             # TODO: Weird? Cheating? Could conflict with each other? Doesn't properly represent the real result?
-            best_genomes = stats.best_unique_genomes(num_best)
+            best_genomes = stats.best_unique_genomes(config.gym_config.num_best)
             best_networks = [neat.nn.FeedForwardNetwork.create(g, config) for g in best_genomes]
 
             solved = True
             best_scores = []
-            for k in range(num_evals):
+            for k in range(config.gym_config.num_evals):
                 observation = env.reset()
                 score = 0
                 step = 0
@@ -231,7 +205,7 @@ def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_eval
                 best_scores.append(score)
                 avg_score = np.mean(best_scores)
                 print(k, score, avg_score)
-                if avg_score < score_threshold:
+                if avg_score < config.gym_config.score_threshold:
                     # As soon as our average score drops below this threshold, stop early and decide we aren't good
                     # enough yet.
                     # TODO: This is a super weird criterion. This would mean a different ordering of scores could be
@@ -251,16 +225,17 @@ def run_evolution(config, result_dir, num_best=3, steps_between_eval=5, num_eval
             env.close()
 
 
-def make_config(cfg_path):
-    return neat.Config(LanderGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet, neat.DefaultStagnation, cfg_path)
-
-
-def run():
-    # Load the config file, which is assumed to live in the same directory as this script.
+def main(argv=None):
+    parser = argutils.create_parser(__doc__)
     local_dir = Path(__file__).parent
-    config = make_config(local_dir / "config")
+    parser.add_argument("-d", "--results-dir", metavar="PATH", type=Path, default=local_dir / "results",
+                        help="Directory where results are stored.")
+    parser.add_argument("-c", "--config", metavar="PATH", type=argutils.existing_path, default=local_dir / "config",
+                        help="NEAT config file.")
+    args = parser.parse_args(argv)
 
-    result_path = local_dir / "results"
+    config = make_config(args.config)
+    result_path = args.results_dir.resolve()
     result_path.mkdir(exist_ok=True)
 
     best_genomes = run_evolution(config, result_path)
@@ -278,4 +253,4 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    sys.exit(main())

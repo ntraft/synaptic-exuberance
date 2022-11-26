@@ -12,15 +12,15 @@ import gym.wrappers
 import numpy as np
 
 import util.argparsing as argutils
-import visualize
-from evolve import make_config, LanderGenome
+import moon_lander.visualize as visualize
+from moon_lander.config import make_config, RewardDiscountGenome
 
 
-def make_videos(name, net, result_path, num_episodes=5):
+def make_videos(name, net, gym_config, result_path, num_episodes=5):
     """
     Generate some example videos for the given network.
     """
-    env = gym.make('LunarLander-v2')
+    env = gym.make(gym_config.env_id)
     if not os.environ.get("HEADLESS"):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
@@ -40,6 +40,7 @@ def make_videos(name, net, result_path, num_episodes=5):
                 output = net.activate(observation)
                 outputs.append(output)
                 action = np.argmax(output)
+                # action = env.action_space.sample()
                 observation, reward, done, info = env.step(action)
                 episode_rewards.append(reward)
             rewards.append(episode_rewards)
@@ -70,18 +71,21 @@ def main(argv=None):
     parser.add_argument("-g", "--write-graph", action="store_true", help="Also save a visualization of the network(s).")
     args = parser.parse_args(argv)
     config = make_config(args.config)
-    if args.model == "random":
-        args.model = "random-net.pkl"
-        g = LanderGenome(0)
-        g.configure_new(config.genome_config)
-        with open(args.results_dir / args.model, "wb") as f:
-            pickle.dump(g, f)
+    if args.model.startswith("random"):
+        maybe_num = args.model[6:]  # remove "random"
+        num_models = int(maybe_num) if maybe_num else 1  # e.g. "random6" = six random models
+        args.model = "random-*.pkl"
+        for i in range(num_models):
+            g = RewardDiscountGenome(0)
+            g.configure_new(config.genome_config)
+            with open(args.results_dir / f"random-{i}.pkl", "wb") as f:
+                pickle.dump(g, f)
     for path in sorted(args.results_dir.glob(args.model)):
         with open(path, "rb") as f:
             g = pickle.load(f)
             visualize.draw_net(config, g, savepath=args.results_dir / f"{path.stem}-net-pruned.gv", prune_unused=True)
             net = neat.nn.FeedForwardNetwork.create(g, config)
-            make_videos(path.stem, net, args.results_dir, args.num_episodes)
+            make_videos(path.stem, net, config.gym_config, args.results_dir, args.num_episodes)
 
 
 if __name__ == '__main__':

@@ -8,11 +8,11 @@ fitness_criterion     = max
 fitness_threshold     = 1000.0
 reset_on_extinction   = 0
 
-[LanderGenome]
+[RewardDiscountGenome]
 num_inputs              = 8
 num_hidden              = 0
 num_outputs             = 4
-initial_connection      = partial 0.5
+initial_connection      = partial_nodirect 0.5
 feed_forward            = True
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 1.0
@@ -63,3 +63,9 @@ species_elitism      = 4
 elitism            = 2
 survival_threshold = 0.2
 
+[Gym]
+env_id             = LunarLander-v2
+num_best           = 3
+steps_between_eval = 5
+num_evals          = 100
+score_threshold    = 200

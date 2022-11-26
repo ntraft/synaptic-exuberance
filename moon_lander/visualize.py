@@ -2,7 +2,6 @@
 Viz utils for the OpenAI Lunar Lander.
 """
 import math
-from pathlib import Path
 
 import graphviz
 import matplotlib.pyplot as plt
