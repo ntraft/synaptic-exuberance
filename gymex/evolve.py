@@ -30,7 +30,7 @@ if hasattr(os, "sched_getaffinity"):
     NUM_CORES = len(os.sched_getaffinity(0))
 
 
-def compute_fitness(genome, net, episodes, min_reward, max_reward):
+def compute_fitness(genome, net, episodes, reward_range):
     m = int(round(np.log(0.01) / np.log(genome.discount)))
     discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
 
@@ -38,8 +38,10 @@ def compute_fitness(genome, net, episodes, min_reward, max_reward):
     for score, data in episodes:
         # Compute normalized discounted reward.
         rewards = np.convolve(data[:, -1], discount_function)[m:]
-        rewards = 2 * (rewards - min_reward) / (max_reward - min_reward) - 1.0
-        rewards = np.clip(rewards, -1.0, 1.0)
+        if reward_range:
+            min_reward, max_reward = reward_range
+            rewards = 2 * (rewards - min_reward) / (max_reward - min_reward) - 1.0
+            rewards = np.clip(rewards, -1.0, 1.0)
 
         for row, dr in zip(data, rewards):
             observation = row[:8]
@@ -53,19 +55,17 @@ def compute_fitness(genome, net, episodes, min_reward, max_reward):
 
 
 class PooledErrorCompute(object):
-    def __init__(self, num_workers):
+    def __init__(self, gym_config, num_workers):
+        self.gym_config = gym_config
         self.num_workers = num_workers
         self.test_episodes = []
         self.generation = 0
-
-        self.min_reward = -200
-        self.max_reward = 200
 
         self.episode_score = []
         self.episode_length = []
 
     def simulate(self, nets):
-        env = gym.make('LunarLander-v2')
+        env = gym.make(self.gym_config.env_id)
 
         scores = []
         for genome, net in nets:
@@ -74,7 +74,7 @@ class PooledErrorCompute(object):
             data = []
             while 1:
                 step += 1
-                if step < 200 and random.random() < 0.2:
+                if random.random() < self.gym_config.random_action_prob:
                     action = env.action_space.sample()
                 else:
                     output = net.activate(observation)
@@ -118,7 +118,7 @@ class PooledErrorCompute(object):
         if self.num_workers < 2:
             print(msg + ", serially...")
             for genome, net in nets:
-                reward_error = compute_fitness(genome, net, self.test_episodes, self.min_reward, self.max_reward)
+                reward_error = compute_fitness(genome, net, self.test_episodes, self.gym_config.reward_range)
                 genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
         else:
             print(msg + f", asynchronously on {self.num_workers} workers...")
@@ -126,7 +126,7 @@ class PooledErrorCompute(object):
                 jobs = []
                 for genome, net in nets:
                     jobs.append(pool.apply_async(compute_fitness,
-                                                 (genome, net, self.test_episodes, self.min_reward, self.max_reward)))
+                                                 (genome, net, self.test_episodes, self.gym_config.reward_range)))
 
                 for job, (genome_id, genome) in zip(jobs, genomes):
                     reward_error = job.get(timeout=None)
@@ -146,7 +146,7 @@ def run_evolution(config, result_dir):
     pop.add_reporter(neat.StdOutReporter(True))
     # Checkpoint every 25 generations or 900 seconds.
     pop.add_reporter(neat.Checkpointer(25, 900))
-    ec = PooledErrorCompute(NUM_CORES)
+    ec = PooledErrorCompute(config.gym_config, NUM_CORES)
     steps_between_eval = config.gym_config.steps_between_eval
     best_genomes = None
 

@@ -55,7 +55,12 @@ class GymConfig(neat.Config):
                                               ConfigParameter('num_best', int, 3),
                                               ConfigParameter('steps_between_eval', int, 5),
                                               ConfigParameter('num_evals', int, 100),
-                                              ConfigParameter('score_threshold', float)])
+                                              ConfigParameter('score_threshold', float),
+                                              ConfigParameter('random_action_prob', float, 0.2),
+                                              ConfigParameter('reward_range', list, None)])
+        if self.gym_config.reward_range:
+            self.gym_config.reward_range[0] = float(self.gym_config.reward_range[0])
+            self.gym_config.reward_range[1] = float(self.gym_config.reward_range[1])
 
     def save(self, filename):
         super().save(filename)
