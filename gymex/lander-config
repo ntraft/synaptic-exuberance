@@ -71,3 +71,4 @@ num_evals          = 100
 score_threshold    = 200
 random_action_prob = 0.2
 reward_range       = -200 200
+new_episode_rate   = 10

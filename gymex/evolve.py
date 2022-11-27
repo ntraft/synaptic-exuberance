@@ -61,7 +61,9 @@ def take_step(env, observation, networks, random_action_prob=0.0):
     return all_actions, action, observation, reward, done, info
 
 
-def compute_fitness(genome, net, episodes, reward_range):
+def compute_reward_prediction_error(args):
+    genome, net, episodes, reward_range = args
+
     m = int(round(np.log(0.01) / np.log(genome.discount)))
     discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
 
@@ -86,13 +88,13 @@ def compute_fitness(genome, net, episodes, reward_range):
 
 
 class PooledErrorCompute(object):
-    def __init__(self, gym_config, num_workers):
+
+    def __init__(self, gym_config, pool=None):
         self.gym_config = gym_config
-        self.num_workers = num_workers
-        self.test_episodes = []
+        self.pool = pool
         self.reward_range = None
         self.generation = 0
-
+        self.test_episodes = []
         self.episode_score = []
         self.episode_length = []
 
@@ -135,13 +137,13 @@ class PooledErrorCompute(object):
         self.generation += 1
 
         t0 = time.time()
-        # TODO: Paralellize this and make the compute_fitness optional (only applies to discrete action spaces).
         nets = [(g, neat.nn.FeedForwardNetwork.create(g, config)) for gid, g in genomes]
         print(f"Time to create {len(nets)} networks: {time.time() - t0:.2f}s")
         t0 = time.time()
 
         # Periodically generate a new set of episodes for comparison.
-        if self.generation % 10 == 1:
+        # TODO: Paralellize this and make the compute_fitness optional (only applies to discrete action spaces).
+        if self.generation % self.gym_config.new_episode_rate == 1:
             # Keep at most 300 episodes.
             self.test_episodes = self.test_episodes[-300:]
             self.simulate(nets)
@@ -151,22 +153,17 @@ class PooledErrorCompute(object):
         # Assign a composite fitness to each genome; genomes can make progress either
         # by improving their total reward or by making more accurate reward estimates.
         msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
-        if self.num_workers < 2:
+        if self.pool:
+            print(msg + f", asynchronously...")
+            jobs = [(genome, net, self.test_episodes, self.reward_range) for genome, net in nets]
+            results = self.pool.map(compute_reward_prediction_error, jobs)
+            for i, reward_error in enumerate(results):
+                nets[i][0].fitness = -np.sum(reward_error) / len(self.test_episodes)
+        else:
             print(msg + ", serially...")
             for genome, net in nets:
-                reward_error = compute_fitness(genome, net, self.test_episodes, self.reward_range)
+                reward_error = compute_reward_prediction_error((genome, net, self.test_episodes, self.reward_range))
                 genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
-        else:
-            print(msg + f", asynchronously on {self.num_workers} workers...")
-            with multiprocessing.Pool(self.num_workers) as pool:
-                jobs = []
-                for genome, net in nets:
-                    jobs.append(pool.apply_async(compute_fitness,
-                                                 (genome, net, self.test_episodes, self.reward_range)))
-
-                for job, (genome_id, genome) in zip(jobs, genomes):
-                    reward_error = job.get(timeout=None)
-                    genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
 
         print(f"Final fitness compute time: {time.time() - t0:.2f}s\n")
 
@@ -175,19 +172,30 @@ def run_evolution(config, result_dir):
     """
     Run until the winner from a generation is able to solve the environment or the user interrupts the process.
     """
-    env = gym.make(config.gym_config.env_id)
-    pop = neat.Population(config)
-    stats = reporters.StatisticsReporter()
-    pop.add_reporter(stats)
-    pop.add_reporter(neat.StdOutReporter(True))
-    # Checkpoint every 25 generations or 900 seconds.
-    pop.add_reporter(neat.Checkpointer(25, 900))
-    ec = PooledErrorCompute(config.gym_config, NUM_CORES)
-    steps_between_eval = config.gym_config.steps_between_eval
+    env = None
+    pool = None
     best_genomes = None
 
-    while 1:
-        try:
+    try:
+        print(f'Creating Gym environment "{config.gym_config.env_id}".')
+        env = gym.make(config.gym_config.env_id)
+        if NUM_CORES > 1:
+            print(f"Spawning a pool of {NUM_CORES} processes.")
+            pool = multiprocessing.Pool(NUM_CORES)
+        else:
+            pool = None
+        ec = PooledErrorCompute(config.gym_config, pool)
+
+        pop = neat.Population(config)
+        stats = reporters.StatisticsReporter()
+        pop.add_reporter(stats)
+        pop.add_reporter(neat.StdOutReporter(True))
+        # Checkpoint every 25 generations or 900 seconds.
+        pop.add_reporter(neat.Checkpointer(25, 900))
+
+        steps_between_eval = config.gym_config.steps_between_eval
+
+        while True:
             gen_best = pop.run(ec.evaluate_genomes, steps_between_eval)
 
             # print(gen_best)
@@ -229,9 +237,6 @@ def run_evolution(config, result_dir):
                     if done:
                         break
 
-                ec.episode_score.append(score)
-                ec.episode_length.append(step)
-
                 best_scores.append(score)
                 avg_score = np.mean(best_scores)
                 print(f"Test Episode {k}: score = {score}, avg so far = {avg_score}")
@@ -247,12 +252,18 @@ def run_evolution(config, result_dir):
                 print("Solved.")
                 return best_genomes
 
-        except KeyboardInterrupt:
-            print("User requested termination.")
-            return best_genomes
+        # end while
 
-        finally:
+    except KeyboardInterrupt:
+        print("User requested termination.")
+        return best_genomes
+
+    finally:
+        if env:
             env.close()
+        if pool:
+            pool.terminate()
+            pool.join()
 
 
 def main(argv=None):
@@ -272,7 +283,7 @@ def main(argv=None):
 
     # Save the winners.
     if best_genomes:
-        print(f"Saving {len(best_genomes)} best genomes.")
+        print(f"Saving the {len(best_genomes)} best genomes.")
         for n, g in enumerate(best_genomes):
             name = f"winner-{n}"
             with open(result_path / f"{name}.pkl", "wb") as f:

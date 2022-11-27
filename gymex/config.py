@@ -51,13 +51,14 @@ class GymConfig(neat.Config):
             parameters.read_file(f)
 
         self.gym_config = DefaultClassConfig(dict(parameters.items(self._SECTION_NAME)),
-                                             [ConfigParameter('env_id', str),
-                                              ConfigParameter('num_best', int, 3),
-                                              ConfigParameter('steps_between_eval', int, 5),
-                                              ConfigParameter('num_evals', int, 100),
-                                              ConfigParameter('score_threshold', float),
-                                              ConfigParameter('random_action_prob', float, 0.2),
-                                              ConfigParameter('reward_range', list, None)])
+                                             [ConfigParameter("env_id", str),
+                                              ConfigParameter("num_best", int, 3),
+                                              ConfigParameter("steps_between_eval", int, 5),
+                                              ConfigParameter("num_evals", int, 100),
+                                              ConfigParameter("score_threshold", float),
+                                              ConfigParameter("random_action_prob", float, 0.2),
+                                              ConfigParameter("reward_range", list, None),
+                                              ConfigParameter("new_episode_rate", int, 10)])
         if self.gym_config.reward_range:
             self.gym_config.reward_range[0] = float(self.gym_config.reward_range[0])
             self.gym_config.reward_range[1] = float(self.gym_config.reward_range[1])
@@ -65,8 +66,8 @@ class GymConfig(neat.Config):
     def save(self, filename):
         super().save(filename)
         # Add one additional section.
-        with open(filename, 'a') as f:
-            f.write(f'\n[{self._SECTION_NAME}]\n')
+        with open(filename, "a") as f:
+            f.write(f"\n[{self._SECTION_NAME}]\n")
             self.gym_config.save(f)
 
 
