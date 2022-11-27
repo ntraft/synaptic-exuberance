@@ -14,6 +14,7 @@ import numpy as np
 import util.argparsing as argutils
 import gymex.visualize as visualize
 from gymex.config import make_config, RewardDiscountGenome
+from gymex.evolve import take_step
 
 
 def make_videos(name, net, gym_config, result_path, num_episodes=5):
@@ -37,11 +38,8 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5):
             done = False
             while not done:
                 step += 1
-                output = net.activate(observation)
+                output, _, observation, reward, done, _ = take_step(env, observation, net)
                 outputs.append(output)
-                action = np.argmax(output)
-                # action = env.action_space.sample()
-                observation, reward, done, info = env.step(action)
                 episode_rewards.append(reward)
             rewards.append(episode_rewards)
             print(f"    Score for episode {i}: {sum(episode_rewards)}")

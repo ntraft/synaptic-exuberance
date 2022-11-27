@@ -30,24 +30,55 @@ if hasattr(os, "sched_getaffinity"):
     NUM_CORES = len(os.sched_getaffinity(0))
 
 
+def take_step(env, observation, networks, random_action_prob=0.0):
+    if not isinstance(networks, (tuple, list)):
+        networks = [networks]
+    assert len(networks) > 0 and networks[0] is not None
+
+    # Run the networks.
+    num_outputs = len(networks[0].output_nodes)
+    all_actions = np.zeros((len(networks), num_outputs))
+    for i, n in enumerate(networks):
+        all_actions[i] = n.activate(observation)
+
+    # Choose an action.
+    if random.random() < random_action_prob:
+        # Take a random action with some probability.
+        action = env.action_space.sample()
+    else:
+        if isinstance(env.action_space, gym.spaces.Discrete):
+            # Make a choice from a discrete set of actions. If multiple networks, take the action with the highest
+            # total value.
+            # TODO: Maybe vote instead of summing reward estimates?
+            action = np.argmax(all_actions.sum(axis=0))
+        elif isinstance(env.action_space, gym.spaces.Box):
+            # Output a continuous action. If multiple networks, average them.
+            action = all_actions.mean(axis=0)
+        else:
+            raise RuntimeError(f"Unsupported action space: {env.action_space}")
+
+    observation, reward, done, info = env.step(action)
+    return all_actions, action, observation, reward, done, info
+
+
 def compute_fitness(genome, net, episodes, reward_range):
     m = int(round(np.log(0.01) / np.log(genome.discount)))
     discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
 
     reward_error = []
-    for score, data in episodes:
+    for score, (observations, actions, rewards) in episodes:
         # Compute normalized discounted reward.
-        rewards = np.convolve(data[:, -1], discount_function)[m:]
+        rewards = np.convolve(rewards, discount_function)[m:]
         if reward_range:
+            # NOTE: This is done knowing that we are usually using networks whose outputs are clamped to [-1, 1].
+            # So we need targets in the same range.
             min_reward, max_reward = reward_range
             rewards = 2 * (rewards - min_reward) / (max_reward - min_reward) - 1.0
             rewards = np.clip(rewards, -1.0, 1.0)
 
-        for row, dr in zip(data, rewards):
-            observation = row[:8]
-            action = int(row[8])
-            output = net.activate(observation)
-            reward_error.append(float((output[action] - dr) ** 2))  # squared error from discounted reward value???
+        for obs, act, dr in zip(observations, actions, rewards):
+            output = net.activate(obs)
+            reward_error.append(float((output[act] - dr) ** 2))  # squared error from discounted reward value???
             # TODO: This is extremely vulnerable to strange minima. We need to do more than simply predict the reward of
             # TODO: our own policy.
 
@@ -59,6 +90,7 @@ class PooledErrorCompute(object):
         self.gym_config = gym_config
         self.num_workers = num_workers
         self.test_episodes = []
+        self.reward_range = None
         self.generation = 0
 
         self.episode_score = []
@@ -66,33 +98,36 @@ class PooledErrorCompute(object):
 
     def simulate(self, nets):
         env = gym.make(self.gym_config.env_id)
+        # TODO: Weird thing we're doing for historical compatibility but probably want to remove later.
+        self.reward_range = [-env.spec.reward_threshold, env.spec.reward_threshold]
 
         scores = []
         for genome, net in nets:
             observation = env.reset()
             step = 0
-            data = []
+            observations = []
+            actions = []
+            rewards = []
             while 1:
                 step += 1
-                if random.random() < self.gym_config.random_action_prob:
-                    action = env.action_space.sample()
-                else:
-                    output = net.activate(observation)
-                    action = np.argmax(output)
-
-                observation, reward, done, info = env.step(action)
-                data.append(np.hstack((observation, action, reward)))
+                _, action, observation, reward, done, info = take_step(env, observation, net,
+                                                                       self.gym_config.random_action_prob)
+                observations.append(observation)
+                actions.append(action)
+                rewards.append(reward)
 
                 if done:
                     break
 
-            data = np.array(data)
-            score = np.sum(data[:, -1])
+            observations = np.array(observations)
+            actions = np.array(actions)
+            rewards = np.array(rewards)
+            score = rewards.sum()
             self.episode_score.append(score)
             scores.append(score)
             self.episode_length.append(step)
 
-            self.test_episodes.append((score, data))
+            self.test_episodes.append((score, (observations, actions, rewards)))
 
         print(f"Score range [{min(scores):.3f}, {max(scores):.3f}]")
 
@@ -100,6 +135,7 @@ class PooledErrorCompute(object):
         self.generation += 1
 
         t0 = time.time()
+        # TODO: Paralellize this and make the compute_fitness optional (only applies to discrete action spaces).
         nets = [(g, neat.nn.FeedForwardNetwork.create(g, config)) for gid, g in genomes]
         print(f"Time to create {len(nets)} networks: {time.time() - t0:.2f}s")
         t0 = time.time()
@@ -118,7 +154,7 @@ class PooledErrorCompute(object):
         if self.num_workers < 2:
             print(msg + ", serially...")
             for genome, net in nets:
-                reward_error = compute_fitness(genome, net, self.test_episodes, self.gym_config.reward_range)
+                reward_error = compute_fitness(genome, net, self.test_episodes, self.reward_range)
                 genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
         else:
             print(msg + f", asynchronously on {self.num_workers} workers...")
@@ -126,7 +162,7 @@ class PooledErrorCompute(object):
                 jobs = []
                 for genome, net in nets:
                     jobs.append(pool.apply_async(compute_fitness,
-                                                 (genome, net, self.test_episodes, self.gym_config.reward_range)))
+                                                 (genome, net, self.test_episodes, self.reward_range)))
 
                 for job, (genome_id, genome) in zip(jobs, genomes):
                     reward_error = job.get(timeout=None)
@@ -186,13 +222,7 @@ def run_evolution(config, result_dir):
                     step += 1
                     # Use the total reward estimates from all the best networks to
                     # determine the best action given the current state.
-                    votes = np.zeros((4,))
-                    for n in best_networks:
-                        output = n.activate(observation)
-                        votes[np.argmax(output)] += 1
-
-                    best_action = np.argmax(votes)
-                    observation, reward, done, info = env.step(best_action)
+                    _, _, observation, reward, done, _ = take_step(env, observation, best_networks)
                     score += reward
                     if not os.environ.get("HEADLESS"):
                         env.render()
@@ -204,7 +234,7 @@ def run_evolution(config, result_dir):
 
                 best_scores.append(score)
                 avg_score = np.mean(best_scores)
-                print(k, score, avg_score)
+                print(f"Test Episode {k}: score = {score}, avg so far = {avg_score}")
                 if avg_score < config.gym_config.score_threshold:
                     # As soon as our average score drops below this threshold, stop early and decide we aren't good
                     # enough yet.
