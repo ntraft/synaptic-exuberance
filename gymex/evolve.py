@@ -3,13 +3,13 @@ Evolve a control/reward estimation network for the Moon Lander example from Open
 LunarLander-v2 environment (https://gym.openai.com/envs/LunarLander-v2).
 Sample run here: https://gym.openai.com/evaluations/eval_FbKq5MxAS9GlvB7W6ioJkg
 """
-
 import multiprocessing
 import os
 import pickle
 import random
 import sys
 import time
+from collections import namedtuple
 from pathlib import Path
 
 import neat
@@ -68,9 +68,9 @@ def compute_reward_prediction_error(args):
     discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
 
     reward_error = []
-    for score, (observations, actions, rewards) in episodes:
+    for ep in episodes:
         # Compute normalized discounted reward.
-        rewards = np.convolve(rewards, discount_function)[m:]
+        rewards = np.convolve(ep.rewards, discount_function)[m:]
         if reward_range:
             # NOTE: This is done knowing that we are usually using networks whose outputs are clamped to [-1, 1].
             # So we need targets in the same range.
@@ -78,13 +78,43 @@ def compute_reward_prediction_error(args):
             rewards = 2 * (rewards - min_reward) / (max_reward - min_reward) - 1.0
             rewards = np.clip(rewards, -1.0, 1.0)
 
-        for obs, act, dr in zip(observations, actions, rewards):
+        for obs, act, dr in zip(ep.observations, ep.actions, rewards):
             output = net.activate(obs)
             reward_error.append(float((output[act] - dr) ** 2))  # squared error from discounted reward value???
             # TODO: This is extremely vulnerable to strange minima. We need to do more than simply predict the reward of
             # TODO: our own policy.
 
-    return reward_error
+    return np.mean(reward_error)
+
+
+Episode = namedtuple("Episode", ["observations", "actions", "rewards"])
+
+
+def run_sim_episodes(args):
+    net, gym_config = args
+    env = gym.make(gym_config.env_id)
+    episodes = []
+    for _ in range(gym_config.num_fitness_episodes):
+        observation = env.reset()
+        observations = []
+        actions = []
+        rewards = []
+        while True:
+            _, action, observation, reward, done, info = take_step(env, observation, net,
+                                                                   gym_config.random_action_prob)
+            observations.append(observation)
+            actions.append(action)
+            rewards.append(reward)
+
+            if done:
+                break
+
+        observations = np.array(observations)
+        actions = np.array(actions)
+        rewards = np.array(rewards)
+        episodes.append(Episode(observations, actions, rewards))
+
+    return episodes
 
 
 class PooledErrorCompute(object):
@@ -92,46 +122,24 @@ class PooledErrorCompute(object):
     def __init__(self, gym_config, pool=None):
         self.gym_config = gym_config
         self.pool = pool
-        self.reward_range = None
         self.generation = 0
         self.test_episodes = []
-        self.episode_score = []
-        self.episode_length = []
 
-    def simulate(self, nets):
-        env = gym.make(self.gym_config.env_id)
-        # TODO: Weird thing we're doing for historical compatibility but probably want to remove later.
-        self.reward_range = [-env.spec.reward_threshold, env.spec.reward_threshold]
+    def simulate(self, nets, gym_config):
+        msg = f"Simulating {len(nets)} nets in {gym_config.num_fitness_episodes} episodes"
+        jobs = [(net, gym_config) for _, net in nets]
+        if self.pool:
+            print(msg + f", asynchronously...")
+            results = self.pool.map(run_sim_episodes, jobs)
+        else:
+            print(msg + ", serially...")
+            results = map(run_sim_episodes, jobs)
 
-        scores = []
-        for genome, net in nets:
-            observation = env.reset()
-            step = 0
-            observations = []
-            actions = []
-            rewards = []
-            while 1:
-                step += 1
-                _, action, observation, reward, done, info = take_step(env, observation, net,
-                                                                       self.gym_config.random_action_prob)
-                observations.append(observation)
-                actions.append(action)
-                rewards.append(reward)
-
-                if done:
-                    break
-
-            observations = np.array(observations)
-            actions = np.array(actions)
-            rewards = np.array(rewards)
-            score = rewards.sum()
-            self.episode_score.append(score)
-            scores.append(score)
-            self.episode_length.append(step)
-
-            self.test_episodes.append((score, (observations, actions, rewards)))
-
-        print(f"Score range [{min(scores):.3f}, {max(scores):.3f}]")
+        for i, episodes in enumerate(results):
+            genome = nets[i][0]
+            scores = [ep.rewards.sum() for ep in episodes]
+            genome.fitness = sum(scores) / gym_config.num_fitness_episodes
+            self.test_episodes.extend(episodes)
 
     def evaluate_genomes(self, genomes, config):
         self.generation += 1
@@ -141,31 +149,36 @@ class PooledErrorCompute(object):
         print(f"Time to create {len(nets)} networks: {time.time() - t0:.2f}s")
         t0 = time.time()
 
-        # Periodically generate a new set of episodes for comparison.
-        # TODO: Paralellize this and make the compute_fitness optional (only applies to discrete action spaces).
-        if self.generation % self.gym_config.new_episode_rate == 1:
-            # Keep at most 300 episodes.
-            self.test_episodes = self.test_episodes[-300:]
-            self.simulate(nets)
+        # Periodically generate a new set of episodes for comparison. However, if we are using the score as part of the
+        # fitness computation (`fitness_weight > 0`), then we always need to run this part.
+        if config.gym_config.fitness_weight > 0 or self.generation % config.gym_config.new_episode_rate == 1:
+            # Keep the episodes from the past two generations.
+            num_to_keep = 2 * len(nets) * config.gym_config.num_fitness_episodes
+            self.test_episodes = self.test_episodes[-num_to_keep:]
+            self.simulate(nets, config.gym_config)
             print(f"Simulation run time: {time.time() - t0:.2f}s")
             t0 = time.time()
 
-        # Assign a composite fitness to each genome; genomes can make progress either
-        # by improving their total reward or by making more accurate reward estimates.
-        msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
-        if self.pool:
-            print(msg + f", asynchronously...")
-            jobs = [(genome, net, self.test_episodes, self.reward_range) for genome, net in nets]
-            results = self.pool.map(compute_reward_prediction_error, jobs)
-            for i, reward_error in enumerate(results):
-                nets[i][0].fitness = -np.sum(reward_error) / len(self.test_episodes)
-        else:
-            print(msg + ", serially...")
-            for genome, net in nets:
-                reward_error = compute_reward_prediction_error((genome, net, self.test_episodes, self.reward_range))
-                genome.fitness = -np.sum(reward_error) / len(self.test_episodes)
+        if config.gym_config.reward_prediction_weight > 0.0:
+            # Assign a composite fitness to each genome; genomes can make progress either
+            # by improving their total reward or by making more accurate reward estimates.
+            msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
+            jobs = [(genome, net, self.test_episodes, config.gym_config.reward_range) for genome, net in nets]
+            if self.pool:
+                print(msg + f", asynchronously...")
+                results = self.pool.map(compute_reward_prediction_error, jobs)
+            else:
+                print(msg + ", serially...")
+                results = map(compute_reward_prediction_error, jobs)
+            for i, pred_error in enumerate(results):
+                genome = nets[i][0]
+                if config.gym_config.fitness_weight > 0:
+                    genome.fitness = (config.gym_config.fitness_weight * genome.fitness -
+                                      config.gym_config.reward_prediction_weight * pred_error)
+                else:
+                    genome.fitness = -config.gym_config.reward_prediction_weight * pred_error
 
-        print(f"Final fitness compute time: {time.time() - t0:.2f}s\n")
+            print(f"Reward prediction compute time: {time.time() - t0:.2f}s\n")
 
 
 def run_evolution(config, result_dir):
@@ -202,13 +215,6 @@ def run_evolution(config, result_dir):
 
             visualize.plot_fitness(stats, savepath=result_dir / "fitness.svg")
             visualize.plot_species(stats, savepath=result_dir / "speciation.svg")
-
-            plt.plot(ec.episode_score, 'g-', label='score')
-            plt.plot(ec.episode_length, 'b-', label='length')
-            plt.grid()
-            plt.legend(loc='best')
-            plt.savefig(result_dir / "scores.svg")
-            plt.close()
 
             mfs = np.mean(stats.get_fitness_mean()[-steps_between_eval:])
             print(f"Average mean fitness over last {steps_between_eval} generations: {mfs}")

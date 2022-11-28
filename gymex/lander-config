@@ -64,11 +64,13 @@ elitism            = 2
 survival_threshold = 0.2
 
 [Gym]
-env_id             = LunarLander-v2
-num_best           = 3
-steps_between_eval = 5
-num_evals          = 100
-score_threshold    = 200
-random_action_prob = 0.2
-reward_range       = -200 200
-new_episode_rate   = 10
+env_id                   = LunarLander-v2
+num_fitness_episodes     = 1
+new_episode_rate         = 10
+random_action_prob       = 0.2
+fitness_weight           = 0
+reward_prediction_weight = 50
+num_best                 = 3
+steps_between_eval       = 5
+num_evals                = 100
+score_threshold          = 200
