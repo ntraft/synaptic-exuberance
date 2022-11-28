@@ -67,7 +67,7 @@ def existing_dir(str_path):
         pathlib.Path: The fully-resolved path object, if it exists.
     """
     fldr = existing_path(str_path)
-    if not fldr.is_dir():
+    if fldr.is_dir():
         return fldr
     else:
         raise argparse.ArgumentTypeError(f"{str_path} ({fldr}) is not a valid directory")
