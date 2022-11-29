@@ -221,41 +221,48 @@ def run_evolution(config, result_dir):
             mfs = np.mean(stats.get_fitness_stat(min)[-steps_between_eval:])
             print(f"Average min fitness over last {steps_between_eval} generations: {mfs}")
 
-            # Use the best genomes seen so far as an ensemble-ish control system.
-            # TODO: Weird? Cheating? Could conflict with each other? Doesn't properly represent the real result?
+            # Evaluate the best genomes seen so far.
             best_genomes = stats.best_unique_genomes(config.gym_config.num_best)
             best_networks = [neat.nn.FeedForwardNetwork.create(g, config) for g in best_genomes]
 
-            solved = True
-            best_scores = []
-            for k in range(config.gym_config.num_evals):
-                observation = env.reset()
-                score = 0
-                step = 0
-                while 1:
-                    step += 1
-                    # Use the total reward estimates from all the best networks to
-                    # determine the best action given the current state.
-                    _, _, observation, reward, done, _ = take_step(env, observation, best_networks)
-                    score += reward
-                    if not os.environ.get("HEADLESS"):
-                        env.render()
-                    if done:
+            # If we want to evaluate as an ensemble, just make this a list of one list, so all networks are used
+            # together in one ensemble.
+            if config.gym_config.eval_ensemble:
+                best_networks = [best_networks]
+
+            solved = [True] * len(best_networks)
+            for i, net in enumerate(best_networks):
+                ensemble_text = f" (ensemble of {len(net)} networks)" if isinstance(net, list) else ""
+                print(f"Testing network {i}" + ensemble_text + "...")
+                scores = []
+                for k in range(config.gym_config.num_evals):
+                    observation = env.reset()
+                    score = 0
+                    step = 0
+                    done = False
+                    while not done:
+                        step += 1
+                        # Use the total reward estimates from all the best networks to
+                        # determine the best action given the current state.
+                        _, _, observation, reward, done, _ = take_step(env, observation, net)
+                        score += reward
+                        if not os.environ.get("HEADLESS"):
+                            env.render()
+
+                    scores.append(score)
+                    avg_score = np.mean(scores)
+                    print(f"    Test Episode {k}: score = {score}, avg so far = {avg_score}")
+                    if score < config.gym_config.score_threshold:
+                        # We must always get above the threshold, else stop early and decide we aren't solved yet.
+                        solved[i] = False
                         break
 
-                best_scores.append(score)
-                avg_score = np.mean(best_scores)
-                print(f"Test Episode {k}: score = {score}, avg so far = {avg_score}")
-                if avg_score < config.gym_config.score_threshold:
-                    # As soon as our average score drops below this threshold, stop early and decide we aren't good
-                    # enough yet.
-                    # TODO: This is a super weird criterion. This would mean a different ordering of scores could be
-                    # judged differently.
-                    solved = False
-                    break
-
-            if solved:
-                print("Solved.")
+            if np.any(solved):
+                msg = "Solved by: "
+                for i, s in enumerate(solved):
+                    if s:
+                        msg += f"winner-{best_networks[i]}, "
+                print(msg[:-2])
                 return best_genomes
 
         # end while

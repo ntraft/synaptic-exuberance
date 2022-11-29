@@ -73,4 +73,5 @@ reward_prediction_weight = 50
 num_best                 = 3
 steps_between_eval       = 5
 num_evals                = 100
+eval_ensemble            = True
 score_threshold          = 200

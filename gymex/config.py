@@ -61,6 +61,7 @@ class GymConfig(neat.Config):
                                               ConfigParameter("num_best", int, 3),
                                               ConfigParameter("steps_between_eval", int, 5),
                                               ConfigParameter("num_evals", int, 100),
+                                              ConfigParameter("eval_ensemble", bool, False),
                                               ConfigParameter("score_threshold", float)])
         # If we are using "reward prediction error" as part of our fitness criterion, ensure the action space is
         # discrete. Reward prediction only makes sense for a discrete action space.
