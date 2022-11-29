@@ -129,7 +129,7 @@ class PooledErrorCompute(object):
         msg = f"Simulating {len(nets)} nets in {gym_config.num_fitness_episodes} episodes"
         jobs = [(net, gym_config) for _, net in nets]
         if self.pool:
-            print(msg + f", asynchronously...")
+            print(msg + f", in parallel...")
             results = self.pool.map(run_sim_episodes, jobs)
         else:
             print(msg + ", serially...")
@@ -165,7 +165,7 @@ class PooledErrorCompute(object):
             msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
             jobs = [(genome, net, self.test_episodes, config.gym_config.reward_range) for genome, net in nets]
             if self.pool:
-                print(msg + f", asynchronously...")
+                print(msg + f", in parallel...")
                 results = self.pool.map(compute_reward_prediction_error, jobs)
             else:
                 print(msg + ", serially...")
@@ -208,7 +208,7 @@ def run_evolution(config, result_dir):
 
         steps_between_eval = config.gym_config.steps_between_eval
 
-        while True:
+        while ec.generation < config.gym_config.max_steps:
             gen_best = pop.run(ec.evaluate_genomes, steps_between_eval)
 
             # print(gen_best)
@@ -266,10 +266,10 @@ def run_evolution(config, result_dir):
                 return best_genomes
 
         # end while
+        print("Reached maximum number of generations.")
 
     except KeyboardInterrupt:
         print("User requested termination.")
-        return best_genomes
 
     finally:
         if env:
@@ -277,6 +277,8 @@ def run_evolution(config, result_dir):
         if pool:
             pool.terminate()
             pool.join()
+
+    return best_genomes
 
 
 def main(argv=None):

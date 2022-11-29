@@ -53,6 +53,7 @@ class GymConfig(neat.Config):
 
         self.gym_config = DefaultClassConfig(dict(parameters.items(self._SECTION_NAME)),
                                              [ConfigParameter("env_id", str),
+                                              ConfigParameter("max_steps", int, 200),
                                               ConfigParameter("num_fitness_episodes", int, 15),
                                               ConfigParameter("new_episode_rate", int, 1),
                                               ConfigParameter("random_action_prob", float, 0.2),
