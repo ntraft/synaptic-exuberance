@@ -55,10 +55,9 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5):
 
 def main(argv=None):
     parser = argutils.create_parser(__doc__)
-    local_dir = Path(__file__).parent
     parser.add_argument("-d", "--results-dir", metavar="PATH", type=argutils.existing_dir,
-                        default=local_dir / "results", help="Directory where results are stored.")
-    parser.add_argument("-c", "--config", metavar="PATH", type=argutils.existing_path, default=local_dir / "config",
+                        help="Directory where results are stored. (default: same as config)")
+    parser.add_argument("-c", "--config", metavar="PATH", type=argutils.existing_path, default="./config",
                         help="NEAT config file.")
     parser.add_argument("-m", "--model", metavar="FILENAME", default="winner*.pkl",
                         help="The model(s) to test. This should be a filename relative to the --results-dir. You may"
@@ -68,6 +67,15 @@ def main(argv=None):
                         help="Number of episodes to run on each model.")
     parser.add_argument("-g", "--write-graph", action="store_true", help="Also save a visualization of the network(s).")
     args = parser.parse_args(argv)
+    user_supplied_args = parser.get_user_specified_args()
+
+    # If results dir is user-specified but config is not, find the config in that directory.
+    if args.results_dir and args.results_dir.is_dir() and "config" not in user_supplied_args:
+        args.config = args.results_dir / "config"
+    # Otherwise, use the existing config value. If results dir was not specified, use the config dir.
+    if not args.results_dir:
+        args.results_dir = args.config.parent
+    
     config = make_config(args.config)
     if args.model.startswith("random"):
         maybe_num = args.model[6:]  # remove "random"

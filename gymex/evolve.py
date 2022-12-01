@@ -194,7 +194,9 @@ def run_evolution(config, result_dir):
         env = gym.make(config.gym_config.env_id)
         if NUM_CORES > 1:
             print(f"Spawning a pool of {NUM_CORES} processes.")
+            t0 = time.time()
             pool = multiprocessing.Pool(NUM_CORES)
+            print(f"Time to create process pool: {time.time() - t0:.2f}s", flush=True)
         else:
             pool = None
         ec = PooledErrorCompute(config.gym_config, pool)
@@ -283,16 +285,29 @@ def run_evolution(config, result_dir):
 
 def main(argv=None):
     parser = argutils.create_parser(__doc__)
-    local_dir = Path(__file__).parent
-    parser.add_argument("-d", "--results-dir", metavar="PATH", type=Path, default=local_dir / "results",
-                        help="Directory where results are stored.")
-    parser.add_argument("-c", "--config", metavar="PATH", type=argutils.existing_path, default=local_dir / "config",
-                        help="NEAT config file.")
+    parser.add_argument("-d", "--results-dir", metavar="PATH", type=Path, help="Directory where results are stored. (default: same as config)")
+    parser.add_argument("-c", "--config", metavar="PATH", type=Path, default="./config", help="NEAT config file.")
     args = parser.parse_args(argv)
+    user_supplied_args = parser.get_user_specified_args()
+
+    # If results dir is user-specified but config is not, find the config in that directory.
+    if args.results_dir and args.results_dir.is_dir() and "config" not in user_supplied_args:
+        args.config = args.results_dir / "config"
+    # Otherwise, use the existing config value. If results dir was not specified, use the config dir.
+    if not args.config.is_file():
+        raise FileNotFoundError(f"argument -c/--config: {args.config} ({args.config.resolve()}) is not a valid file.")
+    if not args.results_dir:
+        # But if we are using the default config, then use a "results" dir in the script location.
+        local_dir = Path(__file__).parent
+        if args.config.parent == local_dir / "config":
+            args.results_dir = local_dir / "results"
+        else:
+            args.results_dir = args.config.parent
 
     config = make_config(args.config)
     result_path = args.results_dir.resolve()
     result_path.mkdir(exist_ok=True)
+    print(f"Using result path: {result_path}")
 
     best_genomes = run_evolution(config, result_path)
 
@@ -310,3 +325,4 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main())
+

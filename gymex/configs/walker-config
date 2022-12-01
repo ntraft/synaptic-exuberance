@@ -65,9 +65,10 @@ survival_threshold = 0.2
 
 [Gym]
 env_id                   = BipedalWalker-v3
-num_fitness_episodes     = 1
-random_action_prob       = 0.2
-num_best                 = 1
-steps_between_eval       = 1
+num_fitness_episodes     = 10
+random_action_prob       = 0.0
+num_best                 = 3
+steps_between_eval       = 10
 num_evals                = 100
 score_threshold          = 300
+
