@@ -9,7 +9,6 @@ from pathlib import Path
 
 import neat
 import gym.wrappers
-import numpy as np
 
 import util.argparsing as argutils
 import gymex.visualize as visualize
@@ -26,7 +25,7 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
             # Record one long video for all episodes, but it shouldn't take longer than 60 seconds. Assume 30 fps.
-            env = gym.wrappers.RecordVideo(env, result_path.name, name_prefix=name, video_length=60 * 30)
+            env = gym.wrappers.RecordVideo(env, str(result_path), name_prefix=name, video_length=60 * 30)
     try:
         print(f"Generating videos for {name}...")
         outputs = []
@@ -55,10 +54,7 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5):
 
 def main(argv=None):
     parser = argutils.create_parser(__doc__)
-    parser.add_argument("-d", "--results-dir", metavar="PATH", type=argutils.existing_dir,
-                        help="Directory where results are stored. (default: same as config)")
-    parser.add_argument("-c", "--config", metavar="PATH", type=argutils.existing_path, default="./config",
-                        help="NEAT config file.")
+    argutils.add_experiment_args(parser, True)
     parser.add_argument("-m", "--model", metavar="FILENAME", default="winner*.pkl",
                         help="The model(s) to test. This should be a filename relative to the --results-dir. You may"
                              " also supply a glob pattern to match multiple models. The string 'random' is a special"
@@ -67,16 +63,10 @@ def main(argv=None):
                         help="Number of episodes to run on each model.")
     parser.add_argument("-g", "--write-graph", action="store_true", help="Also save a visualization of the network(s).")
     args = parser.parse_args(argv)
-    user_supplied_args = parser.get_user_specified_args()
-
-    # If results dir is user-specified but config is not, find the config in that directory.
-    if args.results_dir and args.results_dir.is_dir() and "config" not in user_supplied_args:
-        args.config = args.results_dir / "config"
-    # Otherwise, use the existing config value. If results dir was not specified, use the config dir.
-    if not args.results_dir:
-        args.results_dir = args.config.parent
+    argutils.resolve_experiment_args(parser, args, __file__)
     
     config = make_config(args.config)
+    print(f"Saving results to {args.results_dir}.")
     if args.model.startswith("random"):
         maybe_num = args.model[6:]  # remove "random"
         num_models = int(maybe_num) if maybe_num else 1  # e.g. "random6" = six random models

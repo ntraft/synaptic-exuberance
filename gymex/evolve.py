@@ -10,18 +10,15 @@ import random
 import sys
 import time
 from collections import namedtuple
-from pathlib import Path
 
 import neat
 import gym.wrappers
-import matplotlib.pyplot as plt
 import numpy as np
 
 import util.argparsing as argutils
 import util.reporters as reporters
 import gymex.visualize as visualize
 from gymex.config import make_config
-
 
 NUM_CORES = os.cpu_count()
 if hasattr(os, "sched_getaffinity"):
@@ -285,24 +282,9 @@ def run_evolution(config, result_dir):
 
 def main(argv=None):
     parser = argutils.create_parser(__doc__)
-    parser.add_argument("-d", "--results-dir", metavar="PATH", type=Path, help="Directory where results are stored. (default: same as config)")
-    parser.add_argument("-c", "--config", metavar="PATH", type=Path, default="./config", help="NEAT config file.")
+    argutils.add_experiment_args(parser)
     args = parser.parse_args(argv)
-    user_supplied_args = parser.get_user_specified_args()
-
-    # If results dir is user-specified but config is not, find the config in that directory.
-    if args.results_dir and args.results_dir.is_dir() and "config" not in user_supplied_args:
-        args.config = args.results_dir / "config"
-    # Otherwise, use the existing config value. If results dir was not specified, use the config dir.
-    if not args.config.is_file():
-        raise FileNotFoundError(f"argument -c/--config: {args.config} ({args.config.resolve()}) is not a valid file.")
-    if not args.results_dir:
-        # But if we are using the default config, then use a "results" dir in the script location.
-        local_dir = Path(__file__).parent
-        if args.config.parent == local_dir / "config":
-            args.results_dir = local_dir / "results"
-        else:
-            args.results_dir = args.config.parent
+    argutils.resolve_experiment_args(parser, args, __file__)
 
     config = make_config(args.config)
     result_path = args.results_dir.resolve()

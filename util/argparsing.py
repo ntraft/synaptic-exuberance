@@ -102,6 +102,7 @@ class ActionWrapper(argparse.Action):
     """
     A wrapper class which is used to detect which arguments were explicitly supplied by the user.
     """
+
     def __init__(self, action):
         super().__init__(**dict(action._get_kwargs()))
         self.action = action
@@ -125,6 +126,7 @@ class ArgParser(argparse.ArgumentParser):
     an argument on the command-line. It can tell the difference between when the default value is used and when the user
     explicitly supplies the default.
     """
+
     def _add_action(self, action):
         action = ActionWrapper(action)
         return super()._add_action(action)
@@ -285,6 +287,50 @@ def set_seed_from_args(parsed_args):
     set_seed(parsed_args.seed)
 
 
+def add_experiment_args(parser, results_must_exist=False):
+    """
+    Add some args which are used to specify the location of files for running experiments.
+
+    Args:
+        parser (ArgumentParser): The parser to modify.
+        results_must_exist (bool): Whether to allow a non-existing result directory (the caller will create it if
+                                   needed).
+    """
+    # NOTE: We could use `resolved_path` instead of `Path` but it's also useful to know what was the original string
+    # that the user typed in.
+    restype = existing_dir if results_must_exist else Path
+    parser.add_argument("-d", "--results-dir", metavar="PATH", type=restype,
+                        help="Directory where results are stored. (default: same as config)")
+    parser.add_argument("-c", "--config", metavar="PATH", type=Path, default="./config", help="NEAT config file.")
+
+
+def resolve_experiment_args(parser, parsed_args, script_file):
+    """
+    Determine the desired experiment file locations from the given arguments, possibly inferring them from context when
+    not explicitly specified by the user.
+
+    Args:
+        parser (ArgParser): This must be the local ArgParser type; not just any argparse.ArgumentParser.
+        parsed_args (argparse.Namespace): The arguments from the command line.
+        script_file (Path-like): The main file for this program; i.e. `__file__` when called from the main script.
+    """
+    user_supplied_args = parser.get_user_specified_args()
+    # If results dir is user-specified but config is not, find the config in that directory.
+    if parsed_args.results_dir and parsed_args.results_dir.is_dir() and "config" not in user_supplied_args:
+        parsed_args.config = parsed_args.results_dir / "config"
+    # Otherwise, use the existing config value. If results dir was not specified, use the config dir.
+    if not parsed_args.config.is_file():
+        raise FileNotFoundError(
+            f"argument -c/--config: {parsed_args.config} ({parsed_args.config.resolve()}) is not a valid file.")
+    if not parsed_args.results_dir:
+        # But if we are using the default config, then use a "results" dir in the script location.
+        local_dir = Path(script_file).parent
+        if parsed_args.config.parent == local_dir / "config":
+            parsed_args.results_dir = local_dir / "results"
+        else:
+            parsed_args.results_dir = parsed_args.config.parent
+
+
 def add_wandb_args(parser, allow_id=False):
     """
     Adds arguments which would be needed by any program that uses Weights & Biases:
@@ -297,7 +343,8 @@ def add_wandb_args(parser, allow_id=False):
     parser.add_argument("--entity", help="Entity to use for W&B logging." + id_text)
     parser.add_argument("--group", help="Name under which to group this run in W&B.")
     if allow_id:
-        parser.add_argument("--id", help="ID to use for W&B logging. If this project already exists, it will be resumed.")
+        parser.add_argument("--id",
+                            help="ID to use for W&B logging. If this project already exists, it will be resumed.")
     return parser
 
 
