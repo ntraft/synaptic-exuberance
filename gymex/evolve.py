@@ -59,15 +59,22 @@ def take_step(env, observation, networks, random_action_prob=0.0):
 
 
 def compute_reward_prediction_error(args):
-    genome, net, episodes, reward_range = args
+    genome, net, episodes, reward_range, use_reward_discount = args
 
-    m = int(round(np.log(0.01) / np.log(genome.discount)))
-    discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
+    if use_reward_discount:
+        m = int(round(np.log(0.01) / np.log(genome.discount)))
+        discount_function = [genome.discount ** (m - i) for i in range(m + 1)]
+    else:
+        m = None
+        discount_function = None
 
     reward_error = []
     for ep in episodes:
         # Compute normalized discounted reward.
-        rewards = np.convolve(ep.rewards, discount_function)[m:]
+        if use_reward_discount:
+            rewards = np.convolve(ep.rewards, discount_function)[m:]
+        else:
+            rewards = ep.rewards.copy()
         if reward_range:
             # NOTE: This is done knowing that we are usually using networks whose outputs are clamped to [-1, 1].
             # So we need targets in the same range.
@@ -160,7 +167,8 @@ class PooledErrorCompute(object):
             # Assign a composite fitness to each genome; genomes can make progress either
             # by improving their total reward or by making more accurate reward estimates.
             msg = f"Evaluating {len(nets)} nets on {len(self.test_episodes)} test episodes"
-            jobs = [(genome, net, self.test_episodes, config.gym_config.reward_range) for genome, net in nets]
+            jobs = [(genome, net, self.test_episodes, config.gym_config.reward_range,
+                     config.genome_config.use_reward_discount) for genome, net in nets]
             if self.pool:
                 print(msg + f", in parallel...")
                 results = self.pool.map(compute_reward_prediction_error, jobs)
@@ -310,4 +318,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main())
-

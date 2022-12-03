@@ -5,34 +5,48 @@ import random
 
 import gym
 import neat
+import neat.genes
+import neat.genome
 from neat.config import DefaultClassConfig, ConfigParameter, ConfigParser
 
 
 class RewardDiscountGenome(neat.DefaultGenome):
+    @classmethod
+    def parse_config(cls, param_dict):
+        param_dict["node_gene_type"] = neat.genes.DefaultNodeGene
+        param_dict["connection_gene_type"] = neat.genes.DefaultConnectionGene
+        extra_params = [ConfigParameter("use_reward_discount", bool, "false")]
+        return neat.genome.DefaultGenomeConfig(param_dict, extra_params)
+
     def __init__(self, key):
         super().__init__(key)
         self.discount = None
 
     def configure_new(self, config):
         super().configure_new(config)
-        self.discount = 0.01 + 0.98 * random.random()
+        if config.use_reward_discount:
+            self.discount = (0.01 + 0.98 * random.random())
 
     def configure_crossover(self, genome1, genome2, config):
         super().configure_crossover(genome1, genome2, config)
-        self.discount = random.choice((genome1.discount, genome2.discount))
+        if config.use_reward_discount:
+            self.discount = random.choice((genome1.discount, genome2.discount))
 
     def mutate(self, config):
         super().mutate(config)
-        self.discount += random.gauss(0.0, 0.05)
-        self.discount = max(0.01, min(0.99, self.discount))
+        if config.use_reward_discount:
+            self.discount += random.gauss(0.0, 0.05)
+            self.discount = max(0.01, min(0.99, self.discount))
 
     def distance(self, other, config):
         dist = super().distance(other, config)
-        disc_diff = abs(self.discount - other.discount)
-        return dist + disc_diff
+        if config.use_reward_discount:
+            dist += abs(self.discount - other.discount)
+        return dist
 
     def __str__(self):
-        return f"Reward discount: {self.discount}\n{super().__str__()}"
+        disctxt = f"Reward discount: {self.discount}\n" if self.discount is not None else ""
+        return disctxt + super().__str__()
 
 
 class GymConfig(neat.Config):

@@ -16,16 +16,13 @@ initial_connection      = partial_nodirect 0.5
 feed_forward            = True
 compatibility_disjoint_coefficient = 1.0
 compatibility_weight_coefficient   = 1.0
-conn_add_prob           = 0.15
-conn_delete_prob        = 0.1
-node_add_prob           = 0.15
-node_delete_prob        = 0.1
 activation_default      = clamped
 activation_options      = clamped
 activation_mutate_rate  = 0.0
 aggregation_default     = sum
 aggregation_options     = sum
 aggregation_mutate_rate = 0.0
+
 bias_init_mean          = 0.0
 bias_init_stdev         = 1.0
 bias_replace_rate       = 0.02
@@ -33,6 +30,7 @@ bias_mutate_rate        = 0.8
 bias_mutate_power       = 0.4
 bias_max_value          = 30.0
 bias_min_value          = -30.0
+
 response_init_mean      = 1.0
 response_init_stdev     = 0.0
 response_replace_rate   = 0.0
@@ -50,6 +48,13 @@ weight_replace_rate     = 0.02
 weight_mutate_power     = 0.4
 enabled_default         = True
 enabled_mutate_rate     = 0.01
+
+conn_add_prob           = 0.15
+conn_delete_prob        = 0.1
+node_add_prob           = 0.15
+node_delete_prob        = 0.1
+
+use_reward_discount     = True
 
 [DefaultSpeciesSet]
 compatibility_threshold = 3.0
