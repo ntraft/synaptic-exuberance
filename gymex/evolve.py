@@ -184,6 +184,7 @@ def run_evolution(config, result_dir):
     """
     env = None
     pool = None
+    stats = None
     best_genomes = None
 
     try:
@@ -271,6 +272,8 @@ def run_evolution(config, result_dir):
         print("User requested termination.")
 
     finally:
+        if stats:
+            stats.to_pandas().to_pickle(result_dir / "generations.pkl")
         if env:
             env.close()
         if pool:
@@ -288,7 +291,7 @@ def main(argv=None):
 
     config = make_config(args.config)
     result_path = args.results_dir.resolve()
-    result_path.mkdir(exist_ok=True)
+    result_path.mkdir(parents=True, exist_ok=True)
     print(f"Using result path: {result_path}")
 
     best_genomes = run_evolution(config, result_path)

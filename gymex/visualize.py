@@ -62,6 +62,7 @@ def plot_species(stats, view=False, savepath="speciation.svg"):
 
 
 def plot_reward_trajectories(rewards, view=False, savepath="rewards.svg"):
+    """ Given a list of reward trajectories, plots both instantaneous and cumulative reward over time. """
     fig, ((ax1, ax2),) = plt.subplots(1, 2, squeeze=False, figsize=(8, 3), gridspec_kw={"wspace": 0.3, "hspace": 0.3})
     fig.suptitle("Rewards Over Time", fontsize="x-large")
 
