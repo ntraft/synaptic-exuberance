@@ -28,4 +28,4 @@ class StatisticsReporter(neat.StatisticsReporter):
             for name, entry in desc.iterrows():
                 row[f"fitness.{name}"] = entry.iloc[0]
             records.append(row)
-        return pd.DataFrame.from_records(records, index="generation")
+        return pd.DataFrame.from_records(records, index="generation") if records else None

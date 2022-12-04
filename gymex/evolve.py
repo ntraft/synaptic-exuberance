@@ -147,6 +147,7 @@ class PooledErrorCompute(object):
 
     def evaluate_genomes(self, genomes, config):
         self.generation += 1
+        config.update_schedules(self.generation)
 
         t0 = time.time()
         nets = [(g, neat.nn.FeedForwardNetwork.create(g, config)) for gid, g in genomes]
@@ -281,7 +282,9 @@ def run_evolution(config, result_dir):
 
     finally:
         if stats:
-            stats.to_pandas().to_pickle(result_dir / "generations.pkl")
+            df = stats.to_pandas()
+            if df is not None:
+                df.to_pickle(result_dir / "generations.pkl")
         if env:
             env.close()
         if pool:
