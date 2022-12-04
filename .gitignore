@@ -1,5 +1,5 @@
 # Ignore experiment products/outputs.
-results/
+*results/
 experiments/
 **.svg
 **.mp4
