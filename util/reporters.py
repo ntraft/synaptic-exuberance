@@ -28,13 +28,26 @@ class StatisticsReporter(neat.StatisticsReporter):
         }
 
         scores = []
-        for sid, s in species.species.items():
-            for genome in s.members.values():
-                scores.append(genome.fitness)
-                # TODO: Compute and record the size of this genome.
+        conn_sizes = []
+        node_sizes = []
+        for genome in population.values():
+            scores.append(genome.fitness)
+            genome = genome.get_pruned_copy(config.genome_config)
+            conn_sizes.append(len(genome.connections))
+            node_sizes.append(len(genome.nodes))
+        # Store all fitness summary stats.
         desc = pd.DataFrame(scores).describe()
         for name, entry in desc.iterrows():
             record[f"fitness.{name}"] = entry.iloc[0]
+        # Store just a few summary stats about network size.
+        for name, sizes in (("node", node_sizes), ("conn", conn_sizes)):
+            sizes = np.array(sizes)
+            record[name + ".mean"] = sizes.mean()
+            record[name + ".std"] = sizes.std()
+            # noinspection PyArgumentList
+            record[name + ".min"] = sizes.min()
+            # noinspection PyArgumentList
+            record[name + ".max"] = sizes.max()
 
         self.generation_records.append(record)
 
