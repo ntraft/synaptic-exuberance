@@ -266,6 +266,11 @@ def run_evolution(config, result_dir):
                         solved[i] = False
                         break
 
+            # NOTE: This is a hack needed for running in batch mode in Slurm, because multiprocessing seems to prevent
+            # automatic flushing.
+            sys.stderr.flush()
+            sys.stdout.flush()
+
             if np.any(solved):
                 msg = "Solved by: "
                 for i, s in enumerate(solved):
