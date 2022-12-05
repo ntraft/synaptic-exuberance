@@ -138,6 +138,8 @@ class GymConfig(neat.Config):
             current_stage = -1
             for current_stage, sgen in enumerate(self.genome_config.generation_stages):
                 if sgen >= self.generation:
+                    # This stage comes after the current generation, so the current stage is the previous one.
+                    current_stage -= 1
                     break
             if current_stage != self.stage:
                 print(f"Advancing mutation schedule from Stage {self.stage + 1} to Stage {current_stage + 1}.")
