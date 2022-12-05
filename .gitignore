@@ -1,11 +1,14 @@
 # Ignore experiment products/outputs.
-*results/
+*results*/
 experiments/
 **.svg
 **.mp4
 **.gv
 **/winner*
 **/neat-checkpoint*
+
+# Experiment Search Index
+locatedb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
