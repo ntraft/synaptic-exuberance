@@ -133,10 +133,10 @@ class PooledErrorCompute(object):
         msg = f"Simulating {len(nets)} nets in {gym_config.num_fitness_episodes} episodes"
         jobs = [(net, gym_config) for _, net in nets]
         if self.pool:
-            print(msg + f", in parallel...")
+            print(msg + f", in parallel...", flush=True)
             results = self.pool.map(run_sim_episodes, jobs)
         else:
-            print(msg + ", serially...")
+            print(msg + ", serially...", flush=True)
             results = map(run_sim_episodes, jobs)
 
         for i, episodes in enumerate(results):
@@ -186,6 +186,11 @@ class PooledErrorCompute(object):
 
             print(f"Reward prediction compute time: {time.time() - t0:.2f}s\n")
 
+        # NOTE: This is a hack needed for running in batch mode in Slurm, because multiprocessing seems to prevent
+        # automatic flushing.
+        sys.stderr.flush()
+        sys.stdout.flush()
+
 
 def run_evolution(config, result_dir):
     """
@@ -227,8 +232,8 @@ def run_evolution(config, result_dir):
 
             mfs = np.mean(stats.get_fitness_mean()[-steps_between_eval:])
             print(f"Average mean fitness over last {steps_between_eval} generations: {mfs}")
-            mfs = np.mean(stats.get_fitness_stat(min)[-steps_between_eval:])
-            print(f"Average min fitness over last {steps_between_eval} generations: {mfs}")
+            mfs = np.mean(stats.get_fitness_stat(max)[-steps_between_eval:])
+            print(f"Average max fitness over last {steps_between_eval} generations: {mfs}")
 
             # Evaluate the best genomes seen so far.
             best_genomes = stats.best_unique_genomes(config.gym_config.num_best)
