@@ -55,7 +55,8 @@ class StatisticsReporter(neat.StatisticsReporter):
         conn_sizes = []
         node_sizes = []
         changes = []
-        for genome in population.values():
+        # Iterate in order of fitness.
+        for genome in sorted(population.values(), key=lambda g: g.fitness, reverse=True):
             # Record the fitness.
             scores.append(genome.fitness)
 
@@ -95,11 +96,9 @@ class StatisticsReporter(neat.StatisticsReporter):
                 if stat != "count":
                     record[f"{metric}.{stat}"] = entry.iloc[0]
 
-        # Store extra summaries over just the most fit individuals.
-        top5 = sorted(population.values(), key=lambda g: g.fitness)[:5]
-        top5_conns = [len(g.connections) for g in top5]
-        top5_nodes = [len(g.nodes) for g in top5]
-        for name, sizes in (("node", top5_nodes), ("conn", top5_conns)):
+        # Store extra summaries over just the most fit individuals. The values are sorted by fitness already so we can
+        # just take the first 5 off the top.
+        for name, sizes in (("node", node_sizes[:5]), ("conn", conn_sizes[:5])):
             sizes = np.array(sizes)
             record[name + ".top5_mean"] = np.mean(sizes)
             record[name + ".top5_std"] = np.std(sizes)
