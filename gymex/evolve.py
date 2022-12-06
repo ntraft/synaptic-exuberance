@@ -214,7 +214,7 @@ def run_evolution(config, result_dir):
         ec = PooledErrorCompute(config.gym_config, pool)
 
         pop = neat.Population(config)
-        stats = reporters.StatisticsReporter()
+        stats = reporters.StatisticsReporter(pop)
         pop.add_reporter(stats)
         pop.add_reporter(neat.StdOutReporter(True))
         # Checkpoint every 25 generations or 900 seconds.
