@@ -16,7 +16,7 @@ from gymex.config import make_config, RewardDiscountGenome
 from gymex.evolve import take_step
 
 
-def make_videos(name, net, gym_config, result_path, num_episodes=5):
+def make_videos(name, net, gym_config, result_path, num_episodes=5, max_seconds=30):
     """
     Generate some example videos for the given network.
     """
@@ -24,8 +24,8 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5):
     if not os.environ.get("HEADLESS"):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
-            # Record one long video for all episodes, but it shouldn't take longer than 60 seconds. Assume 30 fps.
-            env = gym.wrappers.RecordVideo(env, str(result_path), name_prefix=name, video_length=60 * 30)
+            # Record one long video for all episodes, but it shouldn't take longer than N seconds. Assume 30 fps.
+            env = gym.wrappers.RecordVideo(env, str(result_path), name_prefix=name, video_length=max_seconds * 30)
     try:
         print(f"Generating videos for {name}...")
         outputs = []
@@ -61,6 +61,8 @@ def main(argv=None):
                              " value, indicating we should test a randomly instantiated NEAT genome.")
     parser.add_argument("-n", "--num-episodes", metavar="INT", type=int, default=5,
                         help="Number of episodes to run on each model.")
+    parser.add_argument("-s", "--seconds", metavar="NUM", type=float, default=30,
+                        help="Maximum length of the video for each model, in seconds.")
     parser.add_argument("-g", "--write-graph", action="store_true", help="Also save a visualization of the network(s).")
     args = parser.parse_args(argv)
     argutils.resolve_experiment_args(parser, args, __file__)
@@ -81,7 +83,7 @@ def main(argv=None):
             g = pickle.load(f)
             visualize.draw_net(config, g, savepath=args.results_dir / f"{path.stem}-net-pruned.gv", prune_unused=True)
             net = neat.nn.FeedForwardNetwork.create(g, config)
-            make_videos(path.stem, net, config.gym_config, args.results_dir, args.num_episodes)
+            make_videos(path.stem, net, config.gym_config, args.results_dir, args.num_episodes, args.seconds)
 
 
 if __name__ == '__main__':
