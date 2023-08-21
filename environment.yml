@@ -21,8 +21,7 @@ dependencies:
   - moviepy
   - graphviz
   - python-graphviz
-  - pybox2d
-  - gym
+  - gym-box2d
   - pyglet
   - swig
   - pip:
