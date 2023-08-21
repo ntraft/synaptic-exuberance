@@ -20,7 +20,7 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5, max_seconds=
     """
     Generate some example videos for the given network.
     """
-    env = gym.make(gym_config.env_id)
+    env = gym.make(gym_config.env_id, render_mode="rgb_array")
     if not os.environ.get("HEADLESS"):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", ".*Overwriting existing videos.*")
@@ -33,7 +33,7 @@ def make_videos(name, net, gym_config, result_path, num_episodes=5, max_seconds=
         for i in range(1, num_episodes + 1):
             step = 0
             episode_rewards = []
-            observation = env.reset()
+            observation, _ = env.reset()
             done = False
             while not done:
                 step += 1

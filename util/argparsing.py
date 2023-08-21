@@ -302,6 +302,7 @@ def add_experiment_args(parser, results_must_exist=False):
     parser.add_argument("-d", "--results-dir", metavar="PATH", type=restype,
                         help="Directory where results are stored. (default: same as config)")
     parser.add_argument("-c", "--config", metavar="PATH", type=Path, default="./config", help="NEAT config file.")
+    parser.add_argument("-p", "--proc", metavar="NUM", type=int, help="Number of parallel processes to spawn.")
 
 
 def resolve_experiment_args(parser, parsed_args, script_file):

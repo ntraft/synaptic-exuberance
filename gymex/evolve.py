@@ -54,8 +54,8 @@ def take_step(env, observation, networks, random_action_prob=0.0):
         else:
             raise RuntimeError(f"Unsupported action space: {env.action_space}")
 
-    observation, reward, done, info = env.step(action)
-    return all_actions, action, observation, reward, done, info
+    observation, reward, terminated, truncated, info = env.step(action)
+    return all_actions, action, observation, reward, (terminated or truncated), info
 
 
 def compute_reward_prediction_error(args):
@@ -99,13 +99,13 @@ def run_sim_episodes(args):
     env = gym.make(gym_config.env_id)
     episodes = []
     for _ in range(gym_config.num_fitness_episodes):
-        observation = env.reset()
+        observation, _ = env.reset()
         observations = []
         actions = []
         rewards = []
         while True:
-            _, action, observation, reward, done, info = take_step(env, observation, net,
-                                                                   gym_config.random_action_prob)
+            _, action, observation, reward, done, _ = take_step(env, observation, net,
+                                                                gym_config.random_action_prob)
             observations.append(observation)
             actions.append(action)
             rewards.append(reward)
@@ -192,7 +192,7 @@ class PooledErrorCompute(object):
         sys.stdout.flush()
 
 
-def run_evolution(config, result_dir):
+def run_evolution(config, result_dir, proc=None):
     """
     Run until the winner from a generation is able to solve the environment or the user interrupts the process.
     """
@@ -204,10 +204,11 @@ def run_evolution(config, result_dir):
     try:
         print(f'Creating Gym environment "{config.gym_config.env_id}".')
         env = gym.make(config.gym_config.env_id)
-        if NUM_CORES > 1:
-            print(f"Spawning a pool of {NUM_CORES} processes.")
+        num_proc = NUM_CORES if proc is None else proc
+        if num_proc > 1:
+            print(f"Spawning a pool of {num_proc} processes.")
             t0 = time.time()
-            pool = multiprocessing.Pool(NUM_CORES)
+            pool = multiprocessing.Pool(num_proc)
             print(f"Time to create process pool: {time.time() - t0:.2f}s", flush=True)
         else:
             pool = None
@@ -250,7 +251,7 @@ def run_evolution(config, result_dir):
                 print(f"Testing network {i}" + ensemble_text + "...")
                 scores = []
                 for k in range(config.gym_config.num_evals):
-                    observation = env.reset()
+                    observation, _ = env.reset()
                     score = 0
                     step = 0
                     done = False
@@ -315,7 +316,7 @@ def main(argv=None):
     result_path.mkdir(parents=True, exist_ok=True)
     print(f"Using result path: {result_path}")
 
-    best_genomes = run_evolution(config, result_path)
+    best_genomes = run_evolution(config, result_path, args.proc)
 
     # Save the winners.
     if best_genomes:
