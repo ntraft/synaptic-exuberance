@@ -78,6 +78,6 @@ num_fitness_episodes     = 10
 random_action_prob       = 0.0
 num_best                 = 3
 steps_between_eval       = 10
-num_evals                = 100
+num_evals                = 20
 score_threshold          = 300
 
