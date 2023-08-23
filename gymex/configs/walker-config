@@ -49,15 +49,16 @@ weight_mutate_power     = 0.4
 enabled_default         = True
 enabled_mutate_rate     = 0.01
 
-conn_add_prob           = 0.1
-conn_delete_prob        = 0.1
-node_add_prob           = 0.1
-node_delete_prob        = 0.1
-conn_add_prob_stages    = 0.1
-conn_delete_prob_stages = 0.1
-node_add_prob_stages    = 0.1
-node_delete_prob_stages = 0.1
-generation_stages       = 0
+structural_mutation_surer = True
+conn_add_prob             = 0.1
+conn_delete_prob          = 0.1
+node_add_prob             = 0.1
+node_delete_prob          = 0.1
+conn_add_prob_stages      = 0.1
+conn_delete_prob_stages   = 0.1
+node_add_prob_stages      = 0.1
+node_delete_prob_stages   = 0.1
+generation_stages         = 0
 
 use_reward_discount     = False
 
