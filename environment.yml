@@ -1,6 +1,5 @@
 name: synaptic-exuberance
 channels:
-  - pytorch
   - conda-forge
   - defaults
 dependencies:
@@ -8,24 +7,18 @@ dependencies:
   - pip
   - numpy
   - pandas
-  - scikit-learn
+  - scipy
   - matplotlib
   - notebook
   - seaborn
-  - pyyaml
   - tqdm
-  - pytorch
-  - torchvision
-  - wandb
   - ffmpeg
   - moviepy
-  - graphviz
   - python-graphviz
   - gym-box2d
   - pyglet
   - swig
   - pip:
-    - pyyaml-include
     - gizeh
     # Don't install neat-python from pip, because you'll get a version from 2017.
     # Or, you can install it and change the source to be compatible.
