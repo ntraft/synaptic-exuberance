@@ -2,7 +2,6 @@
 
 [NEAT]
 pop_size              = 150
-max_steps             = 200
 # Note: the fitness threshold will never be reached because
 # we are controlling the termination ourselves based on simulation performance.
 fitness_criterion     = max
@@ -76,6 +75,7 @@ survival_threshold = 0.2
 
 [Gym]
 env_id                   = BipedalWalker-v3
+max_steps                = 200
 num_fitness_episodes     = 10
 random_action_prob       = 0.0
 num_best                 = 3
